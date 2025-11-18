@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import type { SpotifyRecentlyPlayed } from "@/lib/validations/spotify";
+import { generateCurrentJson } from "./current-json";
 
 export async function processRecentlyPlayed(
 	data: SpotifyRecentlyPlayed,
@@ -146,4 +147,8 @@ export async function processRecentlyPlayed(
 			})
 			.onConflictDoNothing();
 	}
+
+	// 9. Generate current.json after processing all items
+	console.log("🔄 Regenerating current.json...");
+	await generateCurrentJson();
 }

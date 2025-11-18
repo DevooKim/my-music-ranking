@@ -304,8 +304,8 @@ DO UPDATE SET
 - [x] 비동기 처리 구현
 - [x] 중복 체크 로직
 
-### Phase 4: 파일 생성 (1일)
-- [ ] current.json 생성 로직
+### Phase 4: 파일 생성 (1일) ✅
+- [x] current.json 생성 로직
 - [ ] S3 업로드 (선택)
 
 ### Phase 5: 테스트 및 최적화 (2일)
