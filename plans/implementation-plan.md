@@ -309,15 +309,15 @@ DO UPDATE SET
 
 ## 7. 구현 단계
 
-### Phase 1: 기반 설정 (1-2일)
-- [ ] Next.js 프로젝트 설정
-- [ ] Drizzle ORM 설정
-- [ ] Neon DB 연결
-- [ ] 환경 변수 설정
+### Phase 1: 기반 설정 (1-2일) ✅
+- [x] Next.js 프로젝트 설정
+- [x] Drizzle ORM 설정
+- [x] Neon DB 연결
+- [x] 환경 변수 설정
 
-### Phase 2: 데이터베이스 구축 (1일)
-- [ ] Drizzle 스키마 정의
-- [ ] 마이그레이션 실행
+### Phase 2: 데이터베이스 구축 (1일) ✅
+- [x] Drizzle 스키마 정의
+- [x] 마이그레이션 실행
 - [ ] 시드 데이터 (선택)
 
 ### Phase 3: API 개발 (2-3일)
