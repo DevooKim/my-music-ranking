@@ -8,6 +8,7 @@ import {
 	serial,
 	date,
 	index,
+	uniqueIndex,
 	primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -121,8 +122,8 @@ export const played = pgTable(
 	(table) => ({
 		playedAtIdx: index("idx_played_at").on(table.playedAt.desc()),
 		trackIdIdx: index("idx_track_id").on(table.trackId),
-		// Unique constraint for preventing duplicates
-		uniquePlay: index("unique_play").on(table.trackId, table.playedAt),
+		// Unique constraint for preventing duplicates (track + played_at combination must be unique)
+		uniquePlay: uniqueIndex("unique_play").on(table.trackId, table.playedAt),
 	}),
 );
 

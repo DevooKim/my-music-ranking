@@ -318,13 +318,13 @@ DO UPDATE SET
 ### Phase 2: 데이터베이스 구축 (1일) ✅
 - [x] Drizzle 스키마 정의
 - [x] 마이그레이션 실행
-- [ ] 시드 데이터 (선택)
+- [x] 시드 데이터 (선택)
 
-### Phase 3: API 개발 (2-3일)
-- [ ] POST /api/v1/recently-played 엔드포인트
-- [ ] 데이터 파싱 및 검증
-- [ ] 비동기 처리 구현
-- [ ] 중복 체크 로직
+### Phase 3: API 개발 (2-3일) ✅
+- [x] POST /api/v1/recently-played 엔드포인트
+- [x] 데이터 파싱 및 검증
+- [x] 비동기 처리 구현
+- [x] 중복 체크 로직
 
 ### Phase 4: 번역 기능 (1-2일)
 - [ ] 번역 API 연동

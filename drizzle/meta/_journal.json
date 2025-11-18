@@ -8,6 +8,13 @@
       "when": 1763473703584,
       "tag": "0000_yielding_spacker_dave",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1763475277197,
+      "tag": "0001_closed_lockjaw",
+      "breakpoints": true
     }
   ]
 }
