@@ -5,11 +5,9 @@
 ### 1.1 프로젝트 목적
 - Spotify API를 활용하여 사용자의 음악 재생 기록을 수집하고 분석
 - 수집된 데이터를 기반으로 개인화된 음악 차트 제공
-- 한국어 번역 기능을 통해 한국 사용자에게 최적화된 UX 제공
 
 ### 1.2 핵심 가치
 - **자동화된 데이터 수집**: Spotify 재생 기록 자동 수집
-- **다국어 지원**: 영문 트랙명의 한국어 번역 제공
 - **실시간 업데이트**: 최신 재생 기록 반영
 
 ## 2. 시스템 아키텍처
@@ -27,7 +25,6 @@
 
 **External APIs**
 - Spotify Web API (재생 기록)
-- 번역 API (한국어 변환)
 
 ### 2.2 시스템 구성도
 
@@ -37,8 +34,8 @@
 [Next.js App Router]
        ↓
 [API Routes] ← [Spotify API]
-       ↓           ↓
-[Drizzle ORM] ← [Translation API]
+       ↓
+[Drizzle ORM]
        ↓
 [Neon PostgreSQL]
        ↓
@@ -118,19 +115,6 @@ CREATE TABLE album_artist (
   artist_id VARCHAR(255) REFERENCES artist(id),
   position INTEGER DEFAULT 0,
   PRIMARY KEY (album_id, artist_id)
-);
-```
-
-**track_name 테이블**
-```sql
-CREATE TABLE track_name (
-  id SERIAL PRIMARY KEY,
-  track_id VARCHAR(255) REFERENCES track(id),
-  name TEXT NOT NULL,           -- 원본 이름
-  kor_name TEXT,                -- 한국어 번역
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(track_id)
 );
 ```
 
@@ -246,13 +230,8 @@ interface ApiResponse {
    ├─ 5. Album 데이터 저장 (없으면 INSERT)
    ├─ 6. Track 데이터 저장 (없으면 INSERT)
    ├─ 7. 관계 테이블 업데이트 (track_artist, album_artist)
-   ├─ 8. track_name 조회
-   │   ├─ 존재하고 kor_name이 있으면 → 9번으로
-   │   └─ 없거나 kor_name이 없으면
-   │       ├─ 번역 API 호출
-   │       └─ track_name INSERT/UPDATE
-   ├─ 9. played 데이터 저장 (중복 체크)
-   └─ 10. current.json 생성/업데이트
+   ├─ 8. played 데이터 저장 (중복 체크)
+   └─ 9. current.json 생성/업데이트
 ```
 
 ### 5.2 중복 데이터 처리 전략
@@ -283,7 +262,6 @@ DO UPDATE SET
       "rank": 1,
       "trackId": "10ghh7XuPOiqW24K8HTu9r",
       "trackName": "Isn't That Good?",
-      "trackNameKor": "그거 좋지 않아?",
       "artists": [
         {
           "id": "2UjX6FLGyUQb4sbookjR3y",
@@ -326,16 +304,11 @@ DO UPDATE SET
 - [x] 비동기 처리 구현
 - [x] 중복 체크 로직
 
-### Phase 4: 번역 기능 (1-2일)
-- [ ] 번역 API 연동
-- [ ] track_name 테이블 관리
-- [ ] 캐싱 전략
-
-### Phase 5: 파일 생성 (1일)
+### Phase 4: 파일 생성 (1일)
 - [ ] current.json 생성 로직
 - [ ] S3 업로드 (선택)
 
-### Phase 6: 테스트 및 최적화 (2일)
+### Phase 5: 테스트 및 최적화 (2일)
 - [ ] 단위 테스트
 - [ ] 통합 테스트
 - [ ] 성능 최적화
@@ -377,5 +350,4 @@ export function middleware(request: NextRequest) {
 - 쿼리 최적화
 
 ### 9.3 캐싱 전략
-- track_name 한국어 번역 캐싱
 - current.json CDN 캐싱
