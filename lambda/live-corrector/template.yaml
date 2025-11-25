@@ -1,0 +1,117 @@
+# This is the SAM template that represents the architecture of your serverless application
+# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-template-basics.html
+
+# The AWSTemplateFormatVersion identifies the capabilities of the template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/format-version-structure.html
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  live-corrector
+
+# Transform section specifies one or more macros that AWS CloudFormation uses to process your template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/transform-section-structure.html
+Transform:
+  - AWS::Serverless-2016-10-31
+
+# Parameters section to define values that can be passed during deployment
+Parameters:
+  AuthToken:
+    Type: String
+    Description: Authentication token
+    NoEcho: true
+  S3BucketName:
+    Type: String
+    Description: S3 bucket name for storage
+  SpotifyClientSecret:
+    Type: String
+    Description: Spotify API client secret
+    NoEcho: true
+  SpotifyClientId:
+    Type: String
+    Description: Spotify API client ID
+    NoEcho: true
+  SpotifyRefreshToken:
+    Type: String
+    Description: Spotify API refresh token
+    NoEcho: true
+  LogLevel:
+    Type: String
+    Description: Log level for the application
+    Default: INFO
+    AllowedValues:
+      - DEBUG
+      - INFO
+      - WARN
+      - ERROR
+  NodeEnv:
+    Type: String
+    Description: Node environment
+    Default: production
+    AllowedValues:
+      - development
+      - production
+
+# Resources declares the AWS resources that you want to include in the stack
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+Resources:
+  # CloudWatch Logs group with 30 days retention
+  ScheduledEventLoggerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/my-music-ranking-live-corrector
+      RetentionInDays: 30
+
+  # This is the Lambda function definition associated with the source code: sqs-payload-logger.js. For all available properties, see
+  # https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+  ScheduledEventLogger:
+    DependsOn: ScheduledEventLoggerLogGroup
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/scheduled-event-logger.ts
+        External:
+          - "@aws-sdk/*"
+    Properties:
+      FunctionName: my-music-ranking-live-corrector
+      CodeUri: .
+      Description: ""
+      MemorySize: 128
+      Timeout: 60
+      Handler: scheduled-event-logger.lambdaHandler
+      Runtime: nodejs22.x
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          AUTH_TOKEN: !Ref AuthToken
+          S3_BUCKET_NAME: !Ref S3BucketName
+          SPOTIFY_CLIENT_SECRET: !Ref SpotifyClientSecret
+          SPOTIFY_CLIENT_ID: !Ref SpotifyClientId
+          SPOTIFY_REFRESH_TOKEN: !Ref SpotifyRefreshToken
+          LOG_LEVEL: !Ref LogLevel
+          NODE_ENV: !Ref NodeEnv
+      # This property associates this Lambda function with a scheduled CloudWatch Event. For all available properties, see
+      # https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#schedule
+      # This example runs every hour.
+      Policies:
+        - Statement:
+            - Action:
+                - s3:PutObject
+                - s3:PutObjectAcl
+              Resource: arn:aws:s3:::my-music-ranking/*
+              Effect: Allow
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
+      Events:
+        Schedule2Hour:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 0/2 * * ? *)
