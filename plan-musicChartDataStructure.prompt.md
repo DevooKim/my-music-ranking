@@ -12,9 +12,9 @@ Spotify 재생 기록을 수집하여 실시간/주간/월간/연간 차트를 �
 
 ### 신규 추가
 
-| 테이블       | 용도                       | 주요 컬럼                           |
-| ------------ | -------------------------- | ----------------------------------- |
-| `chartIndex` | S3 과거 차트 목록 인덱스   | chartType, year, week, month, s3Key |
+| 테이블       | 용도                     | 주요 컬럼                           |
+| ------------ | ------------------------ | ----------------------------------- |
+| `chartIndex` | S3 과거 차트 목록 인덱스 | chartType, year, week, month, s3Key |
 
 > **참고**: `trackChartHistory`는 DB 대신 파일 시스템(`data/cache/track-history.json`)으로 관리
 
@@ -29,7 +29,7 @@ data/
 ├── current/
 │   ├── charts/
 │   │   ├── realtime.json       ← 실시간 (2시간마다 갱신)
-│   │   └── weekly.json         ← 이번 주 (2시간마다 갱신)
+│   │   └── weekly.json         ← 이번 주 (4시간마다 갱신)
 │   └── artists/
 │       ├── realtime.json       ← 아티스트 실시간
 │       └── weekly.json         ← 아티스트 이번 주
@@ -43,8 +43,8 @@ data/
 s3://bucket/
 ├── charts/
 │   ├── weekly/{year}/{week}.json   ← 과거 주간 (확정)
-│   ├── monthly/{year}/{month}.json ← 월간 (현재 포함, 6시간마다 갱신)
-│   └── yearly/{year}.json          ← 연간 (현재 포함, 24시간마다 갱신)
+│   ├── monthly/{year}/{month}.json ← 월간 (현재 포함, 24시간마다 갱신)
+│   └── yearly/{year}.json          ← 연간 (현재 포함, 1주일마다 갱신)
 └── artists/
     ├── weekly/{year}/{week}.json   ← 과거 주간 (확정)
     ├── monthly/{year}/{month}.json ← 월간
@@ -75,20 +75,20 @@ s3://bucket/
 │  ├── 파일: data/current/charts/realtime.json 저장               │
 │  └── 파일: data/current/artists/realtime.json 저장              │
 │                                                                  │
-│  weekly-chart-generator (2시간마다)                              │
+│  weekly-chart-generator (4시간마다)                              │
 │  ├── DB: played 이번 주 집계                                     │
 │  ├── 파일: track-history.json 조회/업데이트 (PEAK, WEEKS)        │
 │  ├── 파일: data/current/charts/weekly.json 저장                 │
 │  ├── 파일: data/current/artists/weekly.json 저장                │
 │  └── (월요일 00:00) 지난주 차트 → S3 확정 저장 + chartIndex 업데이트│
 │                                                                  │
-│  monthly-chart-generator (6시간마다)                             │
+│  monthly-chart-generator (24시간마다)                            │
 │  ├── DB: played 이번 달 집계                                     │
 │  ├── S3: charts/monthly/{year}/{month}.json 저장                │
 │  ├── S3: artists/monthly/{year}/{month}.json 저장               │
 │  └── DB: chartIndex 업데이트                                     │
 │                                                                  │
-│  yearly-chart-generator (24시간마다)                             │
+│  yearly-chart-generator (1주일마다)                              │
 │  ├── DB: played 올해 집계                                        │
 │  ├── S3: charts/yearly/{year}.json 저장                         │
 │  ├── S3: artists/yearly/{year}.json 저장                        │
@@ -101,12 +101,12 @@ s3://bucket/
 ├─────────────────────────────────────────────────────────────────┤
 │  파일 시스템에서 직접 읽기 (현재 데이터)                          │
 │  ├── 실시간: data/current/charts/realtime.json (revalidate 2시간)│
-│  └── 이번 주: data/current/charts/weekly.json (revalidate 2시간) │
+│  └── 이번 주: data/current/charts/weekly.json (revalidate 4시간) │
 │                                                                  │
 │  S3에서 fetch (과거/월간/연간)                                   │
 │  ├── 과거 주간: 정적 (재검증 없음)                                │
-│  ├── 월간: 현재 월만 revalidate 6시간                            │
-│  └── 연간: 현재 연만 revalidate 24시간                           │
+│  ├── 월간: 현재 월만 revalidate 24시간                           │
+│  └── 연간: 현재 연만 revalidate 1주일                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -119,20 +119,20 @@ s3://bucket/
 | 차트      | 표시 컬럼             | 갱신 주기 | 저장소      | DB 사용    |
 | --------- | --------------------- | --------- | ----------- | ---------- |
 | 실시간    | 순위, 재생수          | 2시간     | 파일 시스템 | played만   |
-| 이번 주   | 순위, LW, PEAK, WEEKS | 2시간     | 파일 시스템 | played만   |
+| 이번 주   | 순위, LW, PEAK, WEEKS | 4시간     | 파일 시스템 | played만   |
 | 과거 주간 | 순위, LW, PEAK, WEEKS | 확정      | S3          | chartIndex |
-| 월간      | 순위, 재생수          | 6시간     | S3          | chartIndex |
-| 연간      | 순위, 재생수          | 24시간    | S3          | chartIndex |
+| 월간      | 순위, 재생수          | 24시간    | S3          | chartIndex |
+| 연간      | 순위, 재생수          | 1주일     | S3          | chartIndex |
 
 ### 아티스트 차트
 
 | 차트      | 표시 컬럼            | 갱신 주기 | 저장소      | DB 사용    |
 | --------- | -------------------- | --------- | ----------- | ---------- |
 | 실시간    | 순위, 재생수, 트랙수 | 2시간     | 파일 시스템 | played만   |
-| 이번 주   | 순위, 재생수, 트랙수 | 2시간     | 파일 시스템 | played만   |
+| 이번 주   | 순위, 재생수, 트랙수 | 4시간     | 파일 시스템 | played만   |
 | 과거 주간 | 순위, 재생수, 트랙수 | 확정      | S3          | chartIndex |
-| 월간      | 순위, 재생수, 트랙수 | 6시간     | S3          | chartIndex |
-| 연간      | 순위, 재생수, 트랙수 | 24시간    | S3          | chartIndex |
+| 월간      | 순위, 재생수, 트랙수 | 24시간    | S3          | chartIndex |
+| 연간      | 순위, 재생수, 트랙수 | 1주일     | S3          | chartIndex |
 
 ---
 
@@ -142,10 +142,10 @@ s3://bucket/
 | ------------------------------- | ----------- | --------------------------------------------------------- |
 | `live-corrector` (Lambda, 수정) | 5분마다     | Spotify 수집 → S3 저장 → **POST /api/v1/recently-played** |
 | `realtime-chart-generator`      | 2시간마다   | 트랙 + 아티스트 실시간 차트 → 파일 시스템                 |
-| `weekly-chart-generator`        | 2시간마다   | 트랙 + 아티스트 이번 주 차트 → 파일 시스템                |
+| `weekly-chart-generator`        | 4시간마다   | 트랙 + 아티스트 이번 주 차트 → 파일 시스템                |
 | `weekly-chart-finalizer`        | 매주 월요일 | 지난주 차트 확정 → S3 저장                                |
-| `monthly-chart-generator`       | 6시간마다   | 트랙 + 아티스트 월간 차트 → S3                            |
-| `yearly-chart-generator`        | 24시간마다  | 트랙 + 아티스트 연간 차트 → S3                            |
+| `monthly-chart-generator`       | 24시간마다  | 트랙 + 아티스트 월간 차트 → S3                            |
+| `yearly-chart-generator`        | 1주일마다   | 트랙 + 아티스트 연간 차트 → S3                            |
 
 ---
 
@@ -352,3 +352,25 @@ export const chartIndex = pgTable(
 2. **주간 차트 기준일?** - 월요일~일요일 / 일요일~토요일 중 선택
 
 3. **API 인증 방식?** - live-corrector → Next.js API 호출 시 API Key / IAM 인증 중 선택
+
+## 추가 비용 절감 팁
+
+1. CloudFront 캐싱 활용
+  - S3 직접 접근 → CloudFront 경유
+  - S3 GET 요청 감소
+  - 전송 비용 감소
+
+2. 차트 데이터 압축
+```javascript
+// gzip 압축으로 저장
+await s3Client.send(new PutObjectCommand({
+  Bucket: bucket,
+  Key: key,
+  Body: gzipSync(JSON.stringify(chartData)),
+  ContentType: "application/json",
+  ContentEncoding: "gzip",
+}));
+```
+
+3. Lambda 메모리 최적화
+  - MemorySize: 128
