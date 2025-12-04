@@ -76,19 +76,19 @@ lambda/live-corrector/    ← 새로 작성 예정
 
 ## 체크리스트
 
-- [ ] `feature/s3-duckdb` 브랜치 생성
-- [ ] `duckdb-async` 패키지 설치
-- [ ] `@aws-sdk/client-s3` 패키지 설치
-- [ ] `drizzle-orm`, `drizzle-kit` 제거
-- [ ] `@neondatabase/serverless` 제거
-- [ ] `drizzle/` 폴더 삭제
-- [ ] `drizzle.config.ts` 삭제
-- [ ] `src/db/` 폴더 삭제
-- [ ] `scripts/generate-charts.ts` 삭제
-- [ ] `scripts/generate-current.ts` 삭제
-- [ ] `scripts/migrate.ts` 삭제
-- [ ] `scripts/seed.ts` 삭제
-- [ ] `lambda/live-corrector/` 폴더 삭제
+- [x] `feature/s3-duckdb` 브랜치 생성
+- [x] `duckdb-async` 패키지 설치
+- [x] `@aws-sdk/client-s3` 패키지 설치
+- [x] `drizzle-orm`, `drizzle-kit` 제거
+- [x] `@neondatabase/serverless` 제거 (이미 없음)
+- [x] `drizzle/` 폴더 삭제
+- [x] `drizzle.config.ts` 삭제
+- [x] `src/db/` 폴더 삭제
+- [x] `scripts/generate-charts.ts` 삭제 (파일 없었음)
+- [x] `scripts/generate-current.ts` 삭제
+- [x] `scripts/migrate.ts` 삭제
+- [x] `scripts/seed.ts` 삭제
+- [ ] `lambda/live-corrector/` 폴더 삭제 (보류)
 
 ## 예상 소요 시간
 

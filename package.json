@@ -7,16 +7,11 @@
     "build": "bun run --bun next build",
     "start": "bun run --bun next start",
     "lint": "biome check",
-    "format": "biome format --write",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "bun scripts/migrate.ts",
-    "db:seed": "bun scripts/seed.ts",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "generate:current": "bun scripts/generate-current.ts"
+    "format": "biome format --write"
   },
   "dependencies": {
-    "drizzle-orm": "^0.44.7",
+    "@aws-sdk/client-s3": "^3.943.0",
+    "duckdb-async": "^1.4.2",
     "next": "16.0.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -30,7 +25,6 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "dotenv": "^17.2.3",
-    "drizzle-kit": "^0.31.7",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
