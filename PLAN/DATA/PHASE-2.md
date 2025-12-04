@@ -214,12 +214,12 @@ AWS_SECRET_ACCESS_KEY=xxx
 
 ## 체크리스트
 
-- [ ] `src/lib/utils/s3-paths.ts` 생성
-- [ ] `src/lib/utils/iso-week.ts` 생성
-- [ ] `src/lib/types/played.ts` 생성
-- [ ] `src/lib/utils/spotify-mapper.ts` 생성
-- [ ] `.env.example` 업데이트
-- [ ] `date-fns` 패키지 설치 확인
+- [x] `src/lib/utils/s3-paths.ts` 생성
+- [x] `src/lib/utils/iso-week.ts` 생성
+- [x] `src/lib/types/played.ts` 생성
+- [x] `src/lib/utils/spotify-mapper.ts` 생성
+- [x] `.env.example` 업데이트
+- [x] `date-fns` 패키지 설치 확인
 
 ## 예상 소요 시간
 
