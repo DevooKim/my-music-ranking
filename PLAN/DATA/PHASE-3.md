@@ -1,425 +1,375 @@
-# Phase 3: DuckDB 통합
+# Phase 3: 차트 계산 로직
 
 ## 목표
 
-DuckDB 클라이언트를 구성하고 S3에서 JSON을 직접 쿼리하는 함수를 구현합니다.
+Lambda에서 사용할 차트 계산 로직과 통계 관리 함수를 구현합니다.  
+(DuckDB는 필요시 도입 - 현재는 순수 JS로 구현)
 
 ## 작업 목록
 
-### 3.1 DuckDB 클라이언트 설정
+### 3.1 차트 계산기
 
-**파일:** `src/lib/duckdb/client.ts`
+**파일:** `src/lib/chart/calculator.ts`
 
 ```typescript
-import { Database } from "duckdb-async";
+import type { PlayedItem, ChartItem } from "@/lib/types/played";
 
-let db: Database | null = null;
-
-export async function getDuckDB(): Promise<Database> {
-  if (db) return db;
-  
-  db = await Database.create(":memory:");
-  
-  // httpfs 확장 로드 (S3 접근용)
-  await db.run("INSTALL httpfs");
-  await db.run("LOAD httpfs");
-  
-  // S3 설정
-  await db.run(`SET s3_region = '${process.env.S3_REGION || "ap-northeast-2"}'`);
-  await db.run(`SET s3_access_key_id = '${process.env.AWS_ACCESS_KEY_ID}'`);
-  await db.run(`SET s3_secret_access_key = '${process.env.AWS_SECRET_ACCESS_KEY}'`);
-  
-  return db;
+interface AggregatedTrack {
+  trackId: string;
+  trackName: string;
+  albumId: string;
+  albumName: string;
+  albumImageUrl: string;
+  artistIds: string[];
+  artistNames: string[];
+  playCount: number;
+  totalDurationMs: number;
 }
 
-// 연결 종료 (필요시)
-export async function closeDuckDB(): Promise<void> {
-  if (db) {
-    await db.close();
-    db = null;
+// 재생 기록을 트랙별로 집계
+export function aggregatePlays(items: PlayedItem[]): AggregatedTrack[] {
+  const trackMap = new Map<string, AggregatedTrack>();
+  
+  for (const item of items) {
+    const existing = trackMap.get(item.trackId);
+    
+    if (existing) {
+      existing.playCount += 1;
+      existing.totalDurationMs += item.durationMs;
+    } else {
+      trackMap.set(item.trackId, {
+        trackId: item.trackId,
+        trackName: item.trackName,
+        albumId: item.albumId,
+        albumName: item.albumName,
+        albumImageUrl: item.albumImageUrl,
+        artistIds: item.artistIds,
+        artistNames: item.artistNames,
+        playCount: 1,
+        totalDurationMs: item.durationMs,
+      });
+    }
+  }
+  
+  // playCount 내림차순 정렬
+  return Array.from(trackMap.values())
+    .sort((a, b) => b.playCount - a.playCount);
+}
+
+// 집계된 트랙에 순위 부여
+export function assignRanks(
+  tracks: AggregatedTrack[],
+  limit = 100
+): Omit<ChartItem, "lastRank" | "peakRank" | "weeksOnChart">[] {
+  return tracks.slice(0, limit).map((track, index) => ({
+    rank: index + 1,
+    ...track,
+  }));
+}
+```
+
+### 3.2 차트 비교기 (LW/LM/LY 계산)
+
+**파일:** `src/lib/chart/comparator.ts`
+
+```typescript
+import type { ChartItem, ChartResponse } from "@/lib/types/played";
+
+// 지난 차트와 비교하여 lastRank 계산
+export function compareWithLastChart(
+  currentItems: Omit<ChartItem, "lastRank" | "peakRank" | "weeksOnChart">[],
+  lastChart: ChartResponse | null
+): Omit<ChartItem, "peakRank" | "weeksOnChart">[] {
+  const lastRankMap = new Map<string, number>();
+  
+  if (lastChart) {
+    for (const item of lastChart.items) {
+      lastRankMap.set(item.trackId, item.rank);
+    }
+  }
+  
+  return currentItems.map((item) => ({
+    ...item,
+    lastRank: lastRankMap.get(item.trackId) ?? null,
+  }));
+}
+
+// 순위 변동 계산 헬퍼
+export function getRankChange(current: number, last: number | null): string {
+  if (last === null) return "NEW";
+  if (current < last) return `▲${last - current}`;
+  if (current > last) return `▼${current - last}`;
+  return "-";
+}
+```
+
+### 3.3 트랙 통계 관리자
+
+**파일:** `src/lib/chart/stats-manager.ts`
+
+```typescript
+import type { ChartItem, TrackStats } from "@/lib/types/played";
+
+type ChartType = "weekly" | "monthly" | "yearly";
+
+interface UpdateResult {
+  stats: TrackStats;
+  updated: string[];  // 업데이트된 trackId 목록
+}
+
+// 차트 결과로 트랙 통계 업데이트
+export function updateTrackStats(
+  currentStats: TrackStats,
+  chartItems: Omit<ChartItem, "peakRank" | "weeksOnChart">[],
+  chartType: ChartType,
+  period: string  // "2025-W01", "2025-01", "2025"
+): UpdateResult {
+  const stats = { ...currentStats };
+  const updated: string[] = [];
+  
+  for (const item of chartItems) {
+    const existing = stats[item.trackId];
+    
+    if (!existing) {
+      // 새 트랙
+      stats[item.trackId] = createNewTrackStats(item, chartType, period);
+      updated.push(item.trackId);
+    } else {
+      // 기존 트랙 업데이트
+      const wasUpdated = updateExistingStats(existing, item, chartType, period);
+      if (wasUpdated) updated.push(item.trackId);
+    }
+  }
+  
+  return { stats, updated };
+}
+
+function createNewTrackStats(
+  item: Omit<ChartItem, "peakRank" | "weeksOnChart">,
+  chartType: ChartType,
+  period: string
+): TrackStats[string] {
+  const base = {
+    weeklyPeakRank: Infinity,
+    weeklyPeakPeriod: "",
+    totalWeeksOnChart: 0,
+    monthlyPeakRank: Infinity,
+    monthlyPeakPeriod: "",
+    totalMonthsOnChart: 0,
+    yearlyPeakRank: Infinity,
+    yearlyPeakPeriod: 0,
+    totalYearsOnChart: 0,
+    trackName: item.trackName,
+    artistNames: item.artistNames,
+  };
+  
+  if (chartType === "weekly") {
+    base.weeklyPeakRank = item.rank;
+    base.weeklyPeakPeriod = period;
+    base.totalWeeksOnChart = 1;
+  } else if (chartType === "monthly") {
+    base.monthlyPeakRank = item.rank;
+    base.monthlyPeakPeriod = period;
+    base.totalMonthsOnChart = 1;
+  } else {
+    base.yearlyPeakRank = item.rank;
+    base.yearlyPeakPeriod = parseInt(period);
+    base.totalYearsOnChart = 1;
+  }
+  
+  return base;
+}
+
+function updateExistingStats(
+  existing: TrackStats[string],
+  item: Omit<ChartItem, "peakRank" | "weeksOnChart">,
+  chartType: ChartType,
+  period: string
+): boolean {
+  let updated = false;
+  
+  if (chartType === "weekly") {
+    existing.totalWeeksOnChart += 1;
+    if (item.rank < existing.weeklyPeakRank) {
+      existing.weeklyPeakRank = item.rank;
+      existing.weeklyPeakPeriod = period;
+      updated = true;
+    }
+  } else if (chartType === "monthly") {
+    existing.totalMonthsOnChart += 1;
+    if (item.rank < existing.monthlyPeakRank) {
+      existing.monthlyPeakRank = item.rank;
+      existing.monthlyPeakPeriod = period;
+      updated = true;
+    }
+  } else {
+    existing.totalYearsOnChart += 1;
+    if (item.rank < existing.yearlyPeakRank) {
+      existing.yearlyPeakRank = item.rank;
+      existing.yearlyPeakPeriod = parseInt(period);
+      updated = true;
+    }
+  }
+  
+  // 트랙 메타 업데이트
+  existing.trackName = item.trackName;
+  existing.artistNames = item.artistNames;
+  
+  return updated;
+}
+
+// 통계에서 peak/weeks 정보 가져오기
+export function getStatsForChart(
+  stats: TrackStats,
+  trackId: string,
+  chartType: ChartType
+): { peakRank: number; periodsOnChart: number } {
+  const trackStats = stats[trackId];
+  
+  if (!trackStats) {
+    return { peakRank: Infinity, periodsOnChart: 0 };
+  }
+  
+  if (chartType === "weekly") {
+    return {
+      peakRank: trackStats.weeklyPeakRank,
+      periodsOnChart: trackStats.totalWeeksOnChart,
+    };
+  } else if (chartType === "monthly") {
+    return {
+      peakRank: trackStats.monthlyPeakRank,
+      periodsOnChart: trackStats.totalMonthsOnChart,
+    };
+  } else {
+    return {
+      peakRank: trackStats.yearlyPeakRank,
+      periodsOnChart: trackStats.totalYearsOnChart,
+    };
   }
 }
 ```
 
-### 3.2 S3 JSON 읽기 유틸리티
+### 3.4 차트 생성 통합 함수
 
-**파일:** `src/lib/duckdb/s3-reader.ts`
-
-```typescript
-import { getDuckDB } from "./client";
-import { s3Paths } from "@/lib/utils/s3-paths";
-
-// S3에서 JSON 파일 목록 조회
-export async function listS3JsonFiles(prefix: string): Promise<string[]> {
-  const db = await getDuckDB();
-  const s3Url = s3Paths.toS3Url(prefix);
-  
-  try {
-    const result = await db.all(`
-      SELECT file FROM glob('${s3Url}')
-    `);
-    return result.map((row: any) => row.file);
-  } catch (error) {
-    console.error("Failed to list S3 files:", error);
-    return [];
-  }
-}
-
-// S3 JSON 파일들을 DuckDB 테이블로 로드
-export async function loadJsonToTable(
-  s3Pattern: string,
-  tableName: string
-): Promise<void> {
-  const db = await getDuckDB();
-  const s3Url = s3Paths.toS3Url(s3Pattern);
-  
-  await db.run(`
-    CREATE OR REPLACE TABLE ${tableName} AS
-    SELECT 
-      unnest(items) as item,
-      isoYear,
-      isoWeek
-    FROM read_json_auto('${s3Url}')
-  `);
-}
-```
-
-### 3.3 차트 쿼리 함수 - 실시간
-
-**파일:** `src/lib/duckdb/queries/realtime.ts`
+**파일:** `src/lib/chart/builder.ts`
 
 ```typescript
-import { getDuckDB } from "../client";
-import { s3Paths } from "@/lib/utils/s3-paths";
-import { getCurrentISOWeek } from "@/lib/utils/iso-week";
-import type { ChartItem, ChartResponse } from "@/lib/types/played";
+import type { PlayedItem, ChartItem, ChartResponse, TrackStats } from "@/lib/types/played";
+import { aggregatePlays, assignRanks } from "./calculator";
+import { compareWithLastChart } from "./comparator";
+import { updateTrackStats, getStatsForChart } from "./stats-manager";
 
-export async function queryRealtimeChart(limit = 100): Promise<ChartResponse> {
-  const db = await getDuckDB();
-  const now = new Date();
-  const { isoYear, isoWeek } = getCurrentISOWeek(now);
-  
-  // 현재 주의 raw 데이터 조회
-  const rawUrl = s3Paths.toS3Url(s3Paths.rawWeekGlob(isoYear, isoWeek));
-  
-  const query = `
-    WITH played AS (
-      SELECT unnest(items) as item
-      FROM read_json_auto('${rawUrl}')
-    )
-    SELECT 
-      item.trackId as trackId,
-      item.trackName as trackName,
-      item.albumId as albumId,
-      item.albumName as albumName,
-      item.albumImageUrl as albumImageUrl,
-      item.artistIds as artistIds,
-      item.artistNames as artistNames,
-      COUNT(*) as playCount,
-      SUM(item.durationMs) as totalDurationMs
-    FROM played
-    GROUP BY 
-      item.trackId, item.trackName, item.albumId, 
-      item.albumName, item.albumImageUrl, item.artistIds, item.artistNames
-    ORDER BY playCount DESC
-    LIMIT ${limit}
-  `;
-  
-  const results = await db.all(query);
-  
-  const items: ChartItem[] = results.map((row: any, index: number) => ({
-    rank: index + 1,
-    trackId: row.trackId,
-    trackName: row.trackName,
-    albumId: row.albumId,
-    albumName: row.albumName,
-    albumImageUrl: row.albumImageUrl,
-    artistIds: row.artistIds,
-    artistNames: row.artistNames,
-    playCount: Number(row.playCount),
-    totalDurationMs: Number(row.totalDurationMs),
-  }));
-  
-  return {
-    type: "realtime",
-    period: {
-      start: now.toISOString(),
-      end: now.toISOString(),
-    },
-    generatedAt: now.toISOString(),
-    items,
+type ChartType = "weekly" | "monthly" | "yearly";
+
+interface BuildChartInput {
+  items: PlayedItem[];
+  chartType: ChartType;
+  period: {
+    start: string;
+    end: string;
+    label: string;  // "2025-W01", "2025-01", "2025"
   };
+  lastChart: ChartResponse | null;
+  trackStats: TrackStats;
+  limit?: number;
 }
-```
 
-### 3.4 차트 쿼리 함수 - 주간
-
-**파일:** `src/lib/duckdb/queries/weekly.ts`
-
-```typescript
-import { getDuckDB } from "../client";
-import { s3Paths } from "@/lib/utils/s3-paths";
-import { getISOWeekRange } from "@/lib/utils/iso-week";
-import type { ChartItem, ChartResponse } from "@/lib/types/played";
-
-export async function queryWeeklyChart(
-  isoYear: number,
-  isoWeek: number,
-  limit = 100
-): Promise<ChartResponse> {
-  const db = await getDuckDB();
-  const weeklyUrl = s3Paths.toS3Url(s3Paths.weekly(isoYear, isoWeek));
-  const { start, end } = getISOWeekRange(isoYear, isoWeek);
-  
-  const query = `
-    WITH played AS (
-      SELECT unnest(items) as item
-      FROM read_json_auto('${weeklyUrl}')
-    )
-    SELECT 
-      item.trackId as trackId,
-      item.trackName as trackName,
-      item.albumId as albumId,
-      item.albumName as albumName,
-      item.albumImageUrl as albumImageUrl,
-      item.artistIds as artistIds,
-      item.artistNames as artistNames,
-      COUNT(*) as playCount,
-      SUM(item.durationMs) as totalDurationMs
-    FROM played
-    GROUP BY 
-      item.trackId, item.trackName, item.albumId, 
-      item.albumName, item.albumImageUrl, item.artistIds, item.artistNames
-    ORDER BY playCount DESC
-    LIMIT ${limit}
-  `;
-  
-  const results = await db.all(query);
-  
-  const items: ChartItem[] = results.map((row: any, index: number) => ({
-    rank: index + 1,
-    trackId: row.trackId,
-    trackName: row.trackName,
-    albumId: row.albumId,
-    albumName: row.albumName,
-    albumImageUrl: row.albumImageUrl,
-    artistIds: row.artistIds,
-    artistNames: row.artistNames,
-    playCount: Number(row.playCount),
-    totalDurationMs: Number(row.totalDurationMs),
-  }));
-  
-  return {
-    type: "weekly",
-    period: {
-      start: start.toISOString(),
-      end: end.toISOString(),
-    },
-    generatedAt: new Date().toISOString(),
-    items,
-  };
+interface BuildChartResult {
+  chart: ChartResponse;
+  updatedStats: TrackStats;
 }
-```
 
-### 3.5 차트 쿼리 함수 - 월간
-
-**파일:** `src/lib/duckdb/queries/monthly.ts`
-
-```typescript
-import { getDuckDB } from "../client";
-import { s3Paths } from "@/lib/utils/s3-paths";
-import { startOfMonth, endOfMonth, getISOWeek, getISOWeekYear, eachWeekOfInterval } from "date-fns";
-import type { ChartItem, ChartResponse } from "@/lib/types/played";
-
-export async function queryMonthlyChart(
-  year: number,
-  month: number,
-  limit = 100
-): Promise<ChartResponse> {
-  const db = await getDuckDB();
+export function buildChart(input: BuildChartInput): BuildChartResult {
+  const { items, chartType, period, lastChart, trackStats, limit = 100 } = input;
   
-  const start = startOfMonth(new Date(year, month - 1));
-  const end = endOfMonth(new Date(year, month - 1));
+  // 1. 집계
+  const aggregated = aggregatePlays(items);
   
-  // 해당 월에 포함된 모든 ISO 주차 계산
-  const weeks = eachWeekOfInterval({ start, end }, { weekStartsOn: 1 });
-  const weeklyUrls = weeks.map((weekStart) => {
-    const isoYear = getISOWeekYear(weekStart);
-    const isoWeek = getISOWeek(weekStart);
-    return s3Paths.toS3Url(s3Paths.weekly(isoYear, isoWeek));
+  // 2. 순위 부여
+  const ranked = assignRanks(aggregated, limit);
+  
+  // 3. 지난 차트와 비교 (lastRank)
+  const withLastRank = compareWithLastChart(ranked, lastChart);
+  
+  // 4. 통계 업데이트
+  const { stats: updatedStats } = updateTrackStats(
+    trackStats,
+    withLastRank,
+    chartType,
+    period.label
+  );
+  
+  // 5. peak/weeks 정보 추가
+  const finalItems: ChartItem[] = withLastRank.map((item) => {
+    const { peakRank, periodsOnChart } = getStatsForChart(
+      updatedStats,
+      item.trackId,
+      chartType
+    );
+    
+    return {
+      ...item,
+      peakRank: Math.min(peakRank, item.rank),
+      weeksOnChart: periodsOnChart,
+    };
   });
   
-  // UNION ALL로 여러 weekly 파일 조회
-  const urlList = weeklyUrls.map((url) => `'${url}'`).join(", ");
-  
-  const query = `
-    WITH played AS (
-      SELECT unnest(items) as item
-      FROM read_json_auto([${urlList}])
-    ),
-    filtered AS (
-      SELECT item
-      FROM played
-      WHERE item.playedAt >= '${start.toISOString()}'
-        AND item.playedAt <= '${end.toISOString()}'
-    )
-    SELECT 
-      item.trackId as trackId,
-      item.trackName as trackName,
-      item.albumId as albumId,
-      item.albumName as albumName,
-      item.albumImageUrl as albumImageUrl,
-      item.artistIds as artistIds,
-      item.artistNames as artistNames,
-      COUNT(*) as playCount,
-      SUM(item.durationMs) as totalDurationMs
-    FROM filtered
-    GROUP BY 
-      item.trackId, item.trackName, item.albumId, 
-      item.albumName, item.albumImageUrl, item.artistIds, item.artistNames
-    ORDER BY playCount DESC
-    LIMIT ${limit}
-  `;
-  
-  const results = await db.all(query);
-  
-  const items: ChartItem[] = results.map((row: any, index: number) => ({
-    rank: index + 1,
-    trackId: row.trackId,
-    trackName: row.trackName,
-    albumId: row.albumId,
-    albumName: row.albumName,
-    albumImageUrl: row.albumImageUrl,
-    artistIds: row.artistIds,
-    artistNames: row.artistNames,
-    playCount: Number(row.playCount),
-    totalDurationMs: Number(row.totalDurationMs),
-  }));
-  
-  return {
-    type: "monthly",
+  // 6. 차트 응답 생성
+  const chart: ChartResponse = {
+    type: chartType,
     period: {
-      start: start.toISOString(),
-      end: end.toISOString(),
+      start: period.start,
+      end: period.end,
+      ...(chartType === "weekly" && {
+        isoYear: parseInt(period.label.split("-W")[0]),
+        isoWeek: parseInt(period.label.split("-W")[1]),
+      }),
+      ...(chartType === "monthly" && {
+        year: parseInt(period.label.split("-")[0]),
+        month: parseInt(period.label.split("-")[1]),
+      }),
+      ...(chartType === "yearly" && {
+        year: parseInt(period.label),
+      }),
     },
     generatedAt: new Date().toISOString(),
-    items,
+    items: finalItems,
   };
+  
+  return { chart, updatedStats };
 }
 ```
 
-### 3.6 차트 쿼리 함수 - 연간
+### 3.5 인덱스 파일
 
-**파일:** `src/lib/duckdb/queries/yearly.ts`
-
-```typescript
-import { getDuckDB } from "../client";
-import { s3Paths } from "@/lib/utils/s3-paths";
-import type { ChartItem, ChartResponse } from "@/lib/types/played";
-
-export async function queryYearlyChart(
-  year: number,
-  limit = 100
-): Promise<ChartResponse> {
-  const db = await getDuckDB();
-  
-  const start = new Date(year, 0, 1);
-  const end = new Date(year, 11, 31, 23, 59, 59, 999);
-  
-  // 해당 연도의 모든 weekly 파일 조회
-  const weeklyPattern = s3Paths.toS3Url(s3Paths.weeklyYearGlob(year));
-  
-  const query = `
-    WITH played AS (
-      SELECT unnest(items) as item
-      FROM read_json_auto('${weeklyPattern}')
-    ),
-    filtered AS (
-      SELECT item
-      FROM played
-      WHERE item.playedAt >= '${start.toISOString()}'
-        AND item.playedAt <= '${end.toISOString()}'
-    )
-    SELECT 
-      item.trackId as trackId,
-      item.trackName as trackName,
-      item.albumId as albumId,
-      item.albumName as albumName,
-      item.albumImageUrl as albumImageUrl,
-      item.artistIds as artistIds,
-      item.artistNames as artistNames,
-      COUNT(*) as playCount,
-      SUM(item.durationMs) as totalDurationMs
-    FROM filtered
-    GROUP BY 
-      item.trackId, item.trackName, item.albumId, 
-      item.albumName, item.albumImageUrl, item.artistIds, item.artistNames
-    ORDER BY playCount DESC
-    LIMIT ${limit}
-  `;
-  
-  const results = await db.all(query);
-  
-  const items: ChartItem[] = results.map((row: any, index: number) => ({
-    rank: index + 1,
-    trackId: row.trackId,
-    trackName: row.trackName,
-    albumId: row.albumId,
-    albumName: row.albumName,
-    albumImageUrl: row.albumImageUrl,
-    artistIds: row.artistIds,
-    artistNames: row.artistNames,
-    playCount: Number(row.playCount),
-    totalDurationMs: Number(row.totalDurationMs),
-  }));
-  
-  return {
-    type: "yearly",
-    period: {
-      start: start.toISOString(),
-      end: end.toISOString(),
-    },
-    generatedAt: new Date().toISOString(),
-    items,
-  };
-}
-```
-
-### 3.7 쿼리 인덱스 파일
-
-**파일:** `src/lib/duckdb/queries/index.ts`
+**파일:** `src/lib/chart/index.ts`
 
 ```typescript
-export { queryRealtimeChart } from "./realtime";
-export { queryWeeklyChart } from "./weekly";
-export { queryMonthlyChart } from "./monthly";
-export { queryYearlyChart } from "./yearly";
+export { aggregatePlays, assignRanks } from "./calculator";
+export { compareWithLastChart, getRankChange } from "./comparator";
+export { updateTrackStats, getStatsForChart } from "./stats-manager";
+export { buildChart } from "./builder";
 ```
 
 ## 파일 구조
 
 ```
-src/lib/duckdb/
-├── client.ts           ← DuckDB 인스턴스 관리
-├── s3-reader.ts        ← S3 파일 읽기 유틸리티
-└── queries/
-    ├── index.ts
-    ├── realtime.ts
-    ├── weekly.ts
-    ├── monthly.ts
-    └── yearly.ts
+src/lib/chart/
+├── index.ts           ← 내보내기
+├── calculator.ts      ← 집계 및 순위 부여
+├── comparator.ts      ← 지난 차트 비교
+├── stats-manager.ts   ← 트랙 통계 관리
+└── builder.ts         ← 차트 생성 통합
 ```
 
 ## 체크리스트
 
-- [ ] `src/lib/duckdb/client.ts` 생성
-- [ ] `src/lib/duckdb/s3-reader.ts` 생성
-- [ ] `src/lib/duckdb/queries/realtime.ts` 생성
-- [ ] `src/lib/duckdb/queries/weekly.ts` 생성
-- [ ] `src/lib/duckdb/queries/monthly.ts` 생성
-- [ ] `src/lib/duckdb/queries/yearly.ts` 생성
-- [ ] `src/lib/duckdb/queries/index.ts` 생성
-- [ ] 로컬 테스트 (샘플 데이터)
+- [ ] `src/lib/chart/calculator.ts` 생성
+- [ ] `src/lib/chart/comparator.ts` 생성
+- [ ] `src/lib/chart/stats-manager.ts` 생성
+- [ ] `src/lib/chart/builder.ts` 생성
+- [ ] `src/lib/chart/index.ts` 생성
+- [ ] 단위 테스트 작성
 
 ## 예상 소요 시간
 

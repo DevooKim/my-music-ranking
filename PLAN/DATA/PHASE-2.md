@@ -14,9 +14,30 @@ s3://my-music-ranking/
     │       ├── 2025-12-04T00-00-00Z.json
     │       ├── 2025-12-04T02-00-00Z.json
     │       └── ...
-    └── weekly/                           ← Lambda merger가 병합
-        └── {isoYear}/
-            └── week-{isoWeek}.json
+    ├── weekly/                           ← Lambda weekly-processor가 병합
+    │   └── {isoYear}/
+    │       └── week-{isoWeek}.json
+    ├── charts/                           ← Lambda가 계산한 차트 결과
+    │   ├── weekly/{isoYear}/
+    │   │   └── week-{isoWeek}.json       ← LW, peak, weeks 포함
+    │   ├── monthly/{year}/
+    │   │   └── month-{month}.json        ← LM, peak, months 포함
+    │   └── yearly/
+    │       └── {year}.json               ← LY, peak, years 포함
+    └── stats/
+        └── track-stats.json              ← 트랙별 누적 통계
+```
+
+## 데이터 흐름
+
+```
+raw (재생 기록)     →  weekly (병합)     →  charts/weekly (차트)
+                                              ↓
+                                         charts/monthly (집계)
+                                              ↓
+                                         charts/yearly (집계)
+                                              
+                   track-stats.json ← 모든 차트 생성 시 업데이트
 ```
 
 ## 작업 목록
@@ -130,7 +151,7 @@ export interface RawPlayedData {
   items: PlayedItem[];
 }
 
-// Weekly JSON (월요일 병합)
+// Weekly JSON (월요일 병합) - 재생 기록 원본
 export interface WeeklyPlayedData {
   isoYear: number;
   isoWeek: number;
@@ -140,9 +161,13 @@ export interface WeeklyPlayedData {
   items: PlayedItem[];
 }
 
-// 차트 아이템 (집계 결과)
+// 차트 아이템 (집계 결과) - LW/peak/weeks 포함
 export interface ChartItem {
   rank: number;
+  lastRank: number | null;   // 지난 기간 순위 (null = NEW)
+  peakRank: number;          // 역대 최고 순위
+  weeksOnChart: number;      // 차트 진입 횟수 (주간) / monthsOnChart, yearsOnChart
+  
   trackId: string;
   trackName: string;
   albumId: string;
@@ -154,16 +179,45 @@ export interface ChartItem {
   totalDurationMs: number;
 }
 
-// 차트 응답
+// 차트 응답 (charts/ 경로에 저장)
 export interface ChartResponse {
-  type: "realtime" | "weekly" | "monthly" | "yearly";
+  type: "weekly" | "monthly" | "yearly";
   period: {
     start: string;
     end: string;
+    isoYear?: number;   // weekly용
+    isoWeek?: number;   // weekly용
+    year?: number;      // monthly, yearly용
+    month?: number;     // monthly용
   };
   generatedAt: string;
   items: ChartItem[];
 }
+
+// 트랙별 누적 통계 (stats/track-stats.json)
+export interface TrackStats {
+  [trackId: string]: {
+    // 주간 통계
+    weeklyPeakRank: number;
+    weeklyPeakPeriod: string;     // "2025-W01"
+    totalWeeksOnChart: number;
+    
+    // 월간 통계
+    monthlyPeakRank: number;
+    monthlyPeakPeriod: string;    // "2025-01"
+    totalMonthsOnChart: number;
+    
+    // 연간 통계
+    yearlyPeakRank: number;
+    yearlyPeakPeriod: number;     // 2025
+    totalYearsOnChart: number;
+    
+    // 트랙 메타 (캐시용)
+    trackName: string;
+    artistNames: string[];
+  };
+}
+```
 ```
 
 ### 2.4 Spotify → PlayedItem 변환 함수

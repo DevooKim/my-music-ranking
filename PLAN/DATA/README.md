@@ -1,8 +1,8 @@
-# S3 JSON + DuckDB 전환 계획
+# S3 JSON 기반 음악 차트 시스템
 
 ## 개요
 
-PostgreSQL/Drizzle 기반에서 **S3 JSON + DuckDB** 기반으로 데이터 아키텍처를 전환합니다.
+PostgreSQL/Drizzle 기반에서 **S3 JSON** 기반으로 데이터 아키텍처를 전환합니다.
 
 ## 최종 아키텍처
 
@@ -14,24 +14,39 @@ PostgreSQL/Drizzle 기반에서 **S3 JSON + DuckDB** 기반으로 데이터 아�
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Lambda (매주 월요일) - merger                               │
-│  └── raw JSON → weekly JSON 병합                            │
+│  Lambda (매주 월요일) - weekly-processor                     │
+│  ├── raw JSON → weekly JSON 병합                            │
+│  ├── 주간 차트 계산 (LW, peak, weeks 포함)                   │
+│  └── track-stats.json 업데이트                              │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Lambda (매월 1일) - monthly-processor                       │
+│  ├── weekly 차트 집계 → 월간 차트                            │
+│  └── LM, peak, months 계산                                  │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  S3 (데이터 저장소)                                          │
-│  ├── raw/{isoYear}/{isoWeek}/{timestamp}.json               │
-│  └── weekly/{isoYear}/week-{isoWeek}.json                   │
+│  └── played/                                                │
+│      ├── raw/{isoYear}/{isoWeek}/{timestamp}.json           │
+│      ├── weekly/{isoYear}/week-{isoWeek}.json               │
+│      ├── charts/                                            │
+│      │   ├── weekly/{isoYear}/week-{isoWeek}.json           │
+│      │   ├── monthly/{year}/month-{month}.json              │
+│      │   └── yearly/{year}.json                             │
+│      └── stats/track-stats.json                             │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Next.js (ISR + DuckDB)                                      │
-│  ├── 실시간 차트: raw 파일 쿼리 (revalidate 2시간)            │
-│  ├── 주간 차트: weekly 파일 1개 쿼리 (revalidate 4시간)       │
-│  ├── 월간 차트: weekly 파일 N개 쿼리 (revalidate 24시간)      │
-│  └── 연간 차트: weekly 파일 전체 쿼리 (revalidate 1주일)      │
+│  Next.js                                                     │
+│  ├── 실시간 차트: DuckDB로 raw JSON 쿼리 (revalidate 2시간)  │
+│  ├── 주간 차트: charts/weekly JSON 반환 (revalidate 4시간)   │
+│  ├── 월간 차트: charts/monthly JSON 반환 (revalidate 24시간) │
+│  └── 연간 차트: charts/yearly JSON 반환 (revalidate 1주일)   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -40,11 +55,21 @@ PostgreSQL/Drizzle 기반에서 **S3 JSON + DuckDB** 기반으로 데이터 아�
 | Phase | 제목 | 예상 소요 |
 |-------|------|----------|
 | [Phase 1](./PHASE-1.md) | 프로젝트 셋업 | 1일 |
-| [Phase 2](./PHASE-2.md) | S3 구조 설계 | 1일 |
-| [Phase 3](./PHASE-3.md) | DuckDB 통합 | 1일 |
+| [Phase 2](./PHASE-2.md) | S3 구조 및 타입 설계 | 1일 |
+| [Phase 3](./PHASE-3.md) | 차트 계산 로직 | 1일 |
 | [Phase 4](./PHASE-4.md) | Lambda 함수 | 2일 |
-| [Phase 5](./PHASE-5.md) | Next.js API 수정 | 1일 |
+| [Phase 5](./PHASE-5.md) | Next.js API | 1일 |
 | [Phase 6](./PHASE-6.md) | 정리 및 테스트 | 1일 |
+
+## 주요 변경점 (기존 대비)
+
+| 항목 | 기존 계획 | 변경된 계획 |
+|------|----------|------------|
+| 실시간 차트 | DuckDB 전체 사용 | DuckDB로 raw만 쿼리 |
+| 주간/월간/연간 차트 | DuckDB 쿼리 | Lambda 사전 계산 |
+| LW/peak/weeks | ❌ 없음 | ✅ track-stats.json |
+| Next.js 역할 | 전체 집계 | 실시간만 DuckDB, 나머지는 JSON 전달 |
+| DuckDB | 전체 사용 | 실시간 차트 전용 |
 
 ## 데이터 규모
 

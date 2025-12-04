@@ -47,6 +47,9 @@ src/lib/types/
 # 기존 검증
 src/lib/validations/
 └── spotify.ts
+
+# 주의: src/lib/duckdb/는 삭제하지 않음
+# → 실시간 차트 쿼리용으로 유지
 ```
 
 ### 6.2 환경변수 정리
@@ -98,20 +101,26 @@ Spotify 재생 기록 기반 개인 음악 차트 서비스
 └──────────┬──────────┘
            │
 ┌──────────▼──────────┐
-│  Lambda Merger      │  (매주 월요일)
-│  → S3 weekly JSON   │
+│  Lambda Weekly      │  (매주 월요일)
+│  Processor          │
+│  → S3 weekly + 차트 │
 └──────────┬──────────┘
            │
 ┌──────────▼──────────┐
-│  Next.js + DuckDB   │  (ISR 캐싱)
-│  → 차트 API         │
+│  Lambda Monthly     │  (매월 1일)
+│  Processor          │
+│  → S3 월간 차트     │
+└──────────┬──────────┘
+           │
+┌──────────▼──────────┐
+│  Next.js            │  (ISR 캐싱)
+│  → 차트 JSON 반환   │
 └─────────────────────┘
 ```
 
 ## 기술 스택
 
-- **Frontend/API**: Next.js 15
-- **Query Engine**: DuckDB (in-memory)
+- **Frontend/API**: Next.js 16
 - **Storage**: S3 (JSON)
 - **Serverless**: AWS Lambda + SAM
 - **Deployment**: Vercel
@@ -120,18 +129,43 @@ Spotify 재생 기록 기반 개인 음악 차트 서비스
 
 ```
 s3://my-music-ranking/played/
-├── raw/{isoYear}/{isoWeek}/{timestamp}.json
-└── weekly/{isoYear}/week-{isoWeek}.json
+├── raw/{isoYear}/{isoWeek}/{timestamp}.json    ← 2시간마다 수집
+├── weekly/{isoYear}/week-{isoWeek}.json        ← 재생 기록 병합
+├── charts/
+│   ├── weekly/{isoYear}/week-{isoWeek}.json    ← 주간 차트 (LW/peak/weeks)
+│   ├── monthly/{year}/month-{month}.json       ← 월간 차트
+│   └── yearly/{year}.json                      ← 연간 차트
+└── stats/track-stats.json                      ← 트랙별 누적 통계
 ```
 
 ## API 엔드포인트
 
-| Endpoint | Description | Cache |
-|----------|-------------|-------|
-| `/api/v1/charts/realtime` | 실시간 차트 | 2시간 |
-| `/api/v1/charts/weekly` | 주간 차트 | 4시간 |
-| `/api/v1/charts/monthly` | 월간 차트 | 24시간 |
-| `/api/v1/charts/yearly` | 연간 차트 | 1주일 |
+| Endpoint | Description | Source | Cache |
+|----------|-------------|--------|-------|
+| `/api/v1/charts/realtime` | 실시간 차트 | DuckDB | 2시간 |
+| `/api/v1/charts/weekly` | 주간 차트 | S3 JSON | 4시간 |
+| `/api/v1/charts/monthly` | 월간 차트 | S3 JSON | 24시간 |
+| `/api/v1/charts/yearly` | 연간 차트 | S3 JSON | 1주일 |
+
+## 차트 응답 형식
+
+```json
+{
+  "type": "weekly",
+  "period": { "start": "...", "end": "...", "isoYear": 2025, "isoWeek": 49 },
+  "items": [
+    {
+      "rank": 1,
+      "lastRank": 3,        // 지난주 순위 (null = NEW)
+      "peakRank": 1,        // 역대 최고 순위
+      "weeksOnChart": 5,    // 차트 진입 횟수
+      "trackId": "...",
+      "trackName": "...",
+      "playCount": 15
+    }
+  ]
+}
+```
 
 ## 로컬 개발
 
@@ -186,15 +220,6 @@ describe("iso-week", () => {
       expect(result.isoYear).toBe(2026);
       expect(result.isoWeek).toBe(1);
     });
-    
-    it("handles year-start correctly (Jan 1, 2025)", () => {
-      const date = new Date("2025-01-01");
-      const result = getCurrentISOWeek(date);
-      
-      // 2025-01-01 is ISO week 1 of 2025
-      expect(result.isoYear).toBe(2025);
-      expect(result.isoWeek).toBe(1);
-    });
   });
   
   describe("getPreviousISOWeek", () => {
@@ -206,90 +231,106 @@ describe("iso-week", () => {
       expect(result.isoWeek).toBe(49);
     });
   });
-  
-  describe("getISOWeekRange", () => {
-    it("returns correct date range for a week", () => {
-      const { start, end } = getISOWeekRange(2025, 49);
-      
-      expect(start.toISOString().slice(0, 10)).toBe("2025-12-01");
-      expect(end.toISOString().slice(0, 10)).toBe("2025-12-07");
-    });
-  });
 });
 ```
 
-**파일:** `__tests__/lib/utils/s3-paths.test.ts`
+**파일:** `__tests__/lib/chart/calculator.test.ts`
 
 ```typescript
 import { describe, it, expect } from "vitest";
-import { s3Paths } from "@/lib/utils/s3-paths";
+import { aggregatePlays, assignRanks } from "@/lib/chart/calculator";
+import type { PlayedItem } from "@/lib/types/played";
 
-describe("s3-paths", () => {
-  describe("raw", () => {
-    it("generates correct raw path", () => {
-      const path = s3Paths.raw(2025, 49, "2025-12-04T02-00-00Z");
-      expect(path).toBe("played/raw/2025/49/2025-12-04T02-00-00Z.json");
+describe("chart calculator", () => {
+  const sampleItems: PlayedItem[] = [
+    { trackId: "a", trackName: "Song A", albumId: "1", albumName: "Album 1", albumImageUrl: "", artistIds: ["x"], artistNames: ["Artist X"], playedAt: "2025-12-01T10:00:00Z", durationMs: 200000 },
+    { trackId: "a", trackName: "Song A", albumId: "1", albumName: "Album 1", albumImageUrl: "", artistIds: ["x"], artistNames: ["Artist X"], playedAt: "2025-12-01T12:00:00Z", durationMs: 200000 },
+    { trackId: "b", trackName: "Song B", albumId: "2", albumName: "Album 2", albumImageUrl: "", artistIds: ["y"], artistNames: ["Artist Y"], playedAt: "2025-12-01T14:00:00Z", durationMs: 180000 },
+  ];
+  
+  describe("aggregatePlays", () => {
+    it("aggregates play counts correctly", () => {
+      const result = aggregatePlays(sampleItems);
+      
+      expect(result[0].trackId).toBe("a");
+      expect(result[0].playCount).toBe(2);
+      expect(result[1].trackId).toBe("b");
+      expect(result[1].playCount).toBe(1);
     });
     
-    it("pads week number", () => {
-      const path = s3Paths.raw(2025, 1, "2025-01-01T00-00-00Z");
-      expect(path).toBe("played/raw/2025/01/2025-01-01T00-00-00Z.json");
+    it("calculates total duration", () => {
+      const result = aggregatePlays(sampleItems);
+      
+      expect(result[0].totalDurationMs).toBe(400000);
+      expect(result[1].totalDurationMs).toBe(180000);
     });
   });
   
-  describe("weekly", () => {
-    it("generates correct weekly path", () => {
-      const path = s3Paths.weekly(2025, 49);
-      expect(path).toBe("played/weekly/2025/week-49.json");
-    });
-    
-    it("pads week number", () => {
-      const path = s3Paths.weekly(2025, 1);
-      expect(path).toBe("played/weekly/2025/week-01.json");
-    });
-  });
-  
-  describe("toS3Url", () => {
-    it("generates correct S3 URL", () => {
-      const url = s3Paths.toS3Url("played/weekly/2025/week-49.json");
-      expect(url).toContain("s3://");
-      expect(url).toContain("played/weekly/2025/week-49.json");
+  describe("assignRanks", () => {
+    it("assigns correct ranks", () => {
+      const aggregated = aggregatePlays(sampleItems);
+      const ranked = assignRanks(aggregated, 10);
+      
+      expect(ranked[0].rank).toBe(1);
+      expect(ranked[1].rank).toBe(2);
     });
   });
 });
 ```
 
-**파일:** `__tests__/lib/duckdb/queries.test.ts`
+**파일:** `__tests__/lib/chart/stats-manager.test.ts`
 
 ```typescript
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getDuckDB, closeDuckDB } from "@/lib/duckdb/client";
+import { describe, it, expect } from "vitest";
+import { updateTrackStats, getStatsForChart } from "@/lib/chart/stats-manager";
+import type { TrackStats } from "@/lib/types/played";
 
-describe("duckdb client", () => {
-  beforeAll(async () => {
-    // 테스트용 환경변수 설정
-    process.env.S3_BUCKET = "test-bucket";
-    process.env.S3_REGION = "ap-northeast-2";
-  });
-  
-  afterAll(async () => {
-    await closeDuckDB();
-  });
-  
-  it("creates in-memory database", async () => {
-    const db = await getDuckDB();
-    expect(db).toBeDefined();
-  });
-  
-  it("can execute simple query", async () => {
-    const db = await getDuckDB();
-    const result = await db.all("SELECT 1 + 1 as sum");
-    expect(result[0].sum).toBe(2);
+describe("stats-manager", () => {
+  describe("updateTrackStats", () => {
+    it("creates new track stats", () => {
+      const currentStats: TrackStats = {};
+      const chartItems = [
+        { rank: 1, trackId: "a", trackName: "Song A", lastRank: null, /* ... */ } as any,
+      ];
+      
+      const { stats } = updateTrackStats(currentStats, chartItems, "weekly", "2025-W49");
+      
+      expect(stats["a"]).toBeDefined();
+      expect(stats["a"].weeklyPeakRank).toBe(1);
+      expect(stats["a"].totalWeeksOnChart).toBe(1);
+    });
+    
+    it("updates peak rank when improved", () => {
+      const currentStats: TrackStats = {
+        "a": {
+          weeklyPeakRank: 5,
+          weeklyPeakPeriod: "2025-W48",
+          totalWeeksOnChart: 3,
+          monthlyPeakRank: Infinity,
+          monthlyPeakPeriod: "",
+          totalMonthsOnChart: 0,
+          yearlyPeakRank: Infinity,
+          yearlyPeakPeriod: 0,
+          totalYearsOnChart: 0,
+          trackName: "Song A",
+          artistNames: ["Artist X"],
+        },
+      };
+      
+      const chartItems = [
+        { rank: 2, trackId: "a", trackName: "Song A", lastRank: 5 } as any,
+      ];
+      
+      const { stats } = updateTrackStats(currentStats, chartItems, "weekly", "2025-W49");
+      
+      expect(stats["a"].weeklyPeakRank).toBe(2);
+      expect(stats["a"].totalWeeksOnChart).toBe(4);
+    });
   });
 });
 ```
 
-### 6.5 Vitest 설정 (없는 경우)
+### 6.5 Vitest 설정
 
 **파일:** `vitest.config.ts`
 
@@ -326,32 +367,43 @@ export default defineConfig({
 my-music-ranking/
 ├── PLAN/DATA/
 │   ├── README.md
-│   ├── PHASE-1.md
-│   ├── PHASE-2.md
-│   ├── PHASE-3.md
-│   ├── PHASE-4.md
-│   ├── PHASE-5.md
-│   └── PHASE-6.md
+│   ├── PHASE-1.md ~ PHASE-6.md
 ├── lambda/
 │   ├── collector/
-│   ├── merger/
+│   │   └── handler.ts
+│   ├── weekly-processor/
+│   │   └── handler.ts
+│   ├── monthly-processor/
+│   │   └── handler.ts
 │   ├── shared/
+│   │   ├── s3.ts
+│   │   ├── spotify.ts
+│   │   ├── chart.ts
+│   │   └── types.ts
 │   └── template.yaml
 ├── src/
 │   ├── app/
 │   │   ├── api/v1/charts/
-│   │   │   ├── realtime/route.ts
-│   │   │   ├── weekly/route.ts
-│   │   │   ├── monthly/route.ts
-│   │   │   └── yearly/route.ts
+│   │   │   ├── realtime/route.ts  ← DuckDB 쿼리
+│   │   │   ├── weekly/route.ts    ← S3 JSON
+│   │   │   ├── monthly/route.ts   ← S3 JSON
+│   │   │   └── yearly/route.ts    ← S3 JSON
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx
 │   └── lib/
-│       ├── duckdb/
+│       ├── duckdb/                 ← 실시간 차트 전용
 │       │   ├── client.ts
-│       │   ├── s3-reader.ts
 │       │   └── queries/
+│       │       └── realtime.ts
+│       ├── s3/
+│       │   └── client.ts
+│       ├── chart/                  ← Lambda에서 사용
+│       │   ├── calculator.ts
+│       │   ├── comparator.ts
+│       │   ├── stats-manager.ts
+│       │   ├── builder.ts
+│       │   └── index.ts
 │       ├── types/
 │       │   └── played.ts
 │       └── utils/
@@ -360,11 +412,13 @@ my-music-ranking/
 │           └── spotify-mapper.ts
 ├── __tests__/
 │   └── lib/
+│       ├── duckdb/
+│       │   └── realtime.test.ts
 │       ├── utils/
-│       │   ├── iso-week.test.ts
-│       │   └── s3-paths.test.ts
-│       └── duckdb/
-│           └── queries.test.ts
+│       │   └── iso-week.test.ts
+│       └── chart/
+│           ├── calculator.test.ts
+│           └── stats-manager.test.ts
 ├── data/
 │   └── seeds/
 │       └── recently-played.json  ← 샘플 데이터 유지
@@ -381,13 +435,12 @@ my-music-ranking/
 - [ ] `data/cache/` 삭제
 - [ ] `data/example/` 삭제
 - [ ] `src/lib/services/` 삭제
+- [ ] `src/lib/duckdb/` → 새로 작성 (realtime 쿼리용)
 - [ ] `src/lib/utils/chart-storage.ts` 삭제
 - [ ] `src/lib/types/chart.ts` 삭제 (새 타입으로 교체)
 - [ ] `.env.example` 업데이트
 - [ ] `README.md` 업데이트
-- [ ] `__tests__/lib/utils/iso-week.test.ts` 생성
-- [ ] `__tests__/lib/utils/s3-paths.test.ts` 생성
-- [ ] `__tests__/lib/duckdb/queries.test.ts` 생성
+- [ ] 테스트 파일 생성
 - [ ] `vitest.config.ts` 설정
 - [ ] 테스트 실행 및 통과 확인
 - [ ] PR 생성 및 코드 리뷰
@@ -407,5 +460,5 @@ my-music-ranking/
    - 또는 주기적 스냅샷
 
 3. **성능 최적화**
-   - DuckDB 쿼리 튜닝
    - ISR 캐시 히트율 모니터링
+   - Lambda 콜드 스타트 최적화
