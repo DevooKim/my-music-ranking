@@ -31,7 +31,7 @@ PostgreSQL/Drizzle 기반에서 **S3 JSON** 기반으로 데이터 아키텍처�
 ┌─────────────────────────────────────────────────────────────┐
 │  S3 (데이터 저장소)                                          │
 │  └── played/                                                │
-│      ├── raw/{isoYear}/{isoWeek}/{timestamp}.json           │
+│      ├── raw/{isoYear}/{isoWeek}/YYYYMMDD_HHmm.json         │
 │      ├── weekly/{isoYear}/week-{isoWeek}.json               │
 │      ├── charts/                                            │
 │      │   ├── weekly/{isoYear}/week-{isoWeek}.json           │

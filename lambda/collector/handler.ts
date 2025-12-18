@@ -1,5 +1,5 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getISOWeek, getISOWeekYear } from "date-fns";
+import { getISOWeek, getISOWeekYear, format } from "date-fns";
 import { fetchRecentlyPlayed, refreshAccessToken } from "../shared/spotify";
 import { mapSpotifyToPlayedItem, deduplicatePlayedItems } from "../shared/mapper";
 import type { RawPlayedData, PlayedItem } from "../shared/types";
@@ -26,8 +26,8 @@ export const handler = async (): Promise<void> => {
     const dedupedItems = deduplicatePlayedItems(items);
     
     // 4. S3에 저장
-    const timestamp = now.toISOString().replace(/[:.]/g, "-");
-    const key = `played/raw/${isoYear}/${String(isoWeek).padStart(2, "0")}/${timestamp}.json`;
+    const filename = format(now, "yyyyMMdd_HHmm");
+    const key = `played/raw/${isoYear}/${String(isoWeek).padStart(2, "0")}/${filename}.json`;
     
     const rawData: RawPlayedData = {
       collectedAt: now.toISOString(),

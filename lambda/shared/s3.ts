@@ -5,8 +5,8 @@ const BUCKET = process.env.S3_BUCKET || "my-music-ranking";
 const BASE_PATH = "played";
 
 export const s3Paths = {
-  raw: (isoYear: number, isoWeek: number, timestamp: string) =>
-    `${BASE_PATH}/raw/${isoYear}/${String(isoWeek).padStart(2, "0")}/${timestamp}.json`,
+  raw: (isoYear: number, isoWeek: number, filename: string) =>
+    `${BASE_PATH}/raw/${isoYear}/${String(isoWeek).padStart(2, "0")}/${filename}.json`,
   
   weekly: (isoYear: number, isoWeek: number) =>
     `${BASE_PATH}/weekly/${isoYear}/week-${String(isoWeek).padStart(2, "0")}.json`,
