@@ -41,6 +41,9 @@ export interface ChartItem {
   artistNames: string[];
   playCount: number;
   totalDurationMs: number;
+  lastRank: number | null;
+  peakRank: number | null;
+  weeksOnChart: number | null;
 }
 
 // 차트 응답
@@ -49,7 +52,22 @@ export interface ChartResponse {
   period: {
     start: string;
     end: string;
+    isoYear?: number;
+    isoWeek?: number;
+    year?: number;
+    month?: number;
   };
   generatedAt: string;
   items: ChartItem[];
+}
+
+// 트랙 통계 (누적)
+export interface TrackStats {
+  [trackId: string]: {
+    peakRank: number;
+    peakPeriod: string;
+    totalWeeksOnChart: number;
+    trackName: string;
+    artistNames: string[];
+  };
 }

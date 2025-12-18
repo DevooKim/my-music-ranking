@@ -662,14 +662,14 @@ LIMIT 100
 
 ## 체크리스트
 
-- [ ] `src/lib/duckdb/client.ts` 생성
-- [ ] `src/lib/duckdb/index.ts` 생성
-- [ ] `src/lib/chart/calculator.ts` 생성 (DuckDB 사용)
-- [ ] `src/lib/chart/comparator.ts` 생성
-- [ ] `src/lib/chart/stats-manager.ts` 생성
-- [ ] `src/lib/chart/builder.ts` 생성 (DuckDB 사용)
-- [ ] `src/lib/chart/index.ts` 생성
-- [ ] `duckdb` 패키지 설치 (`bun add duckdb`)
+- [x] `src/lib/duckdb/client.ts` 생성
+- [x] `src/lib/duckdb/index.ts` 생성
+- [x] `src/lib/chart/calculator.ts` 생성 (DuckDB 사용)
+- [x] `src/lib/chart/comparator.ts` 생성
+- [x] `src/lib/chart/stats-manager.ts` 생성
+- [x] `src/lib/chart/builder.ts` 생성 (DuckDB 사용)
+- [x] `src/lib/chart/index.ts` 생성
+- [x] `duckdb` 패키지 설치 (`bun add duckdb`)
 - [ ] 단위 테스트 작성
 
 ## 의존성
