@@ -17,6 +17,12 @@
 /.next/
 /out/
 
+# aws sam / lambda
+/.aws-sam
+/lambda/**/dist
+/lambda/**/node_modules
+/lambda/**/.esbuild
+
 # production
 /build
 
