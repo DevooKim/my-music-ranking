@@ -9,8 +9,14 @@ interface SpotifyTrack {
     id: string;
     name: string;
     images?: { url: string }[];
+    total_tracks?: number;
+    external_urls?: { spotify?: string };
   };
-  artists: { id: string; name: string }[];
+  artists: { id: string; name: string; external_urls?: { spotify?: string } }[];
+  external_urls?: { spotify?: string };
+  external_ids?: { isrc?: string };
+  disc_number: number;
+  track_number: number;
 }
 
 interface SpotifyPlayedItem {
@@ -30,8 +36,23 @@ export function mapSpotifyToPlayedItem(
     albumId: track.album.id,
     albumName: track.album.name,
     albumImageUrl: track.album.images?.[0]?.url || "",
+    albumTotalTracks: track.album.total_tracks ?? 0,
+    albumExternalUrls: {
+      spotify: track.album.external_urls?.spotify ?? null,
+    },
     artistIds: track.artists.map((a) => a.id),
     artistNames: track.artists.map((a) => a.name),
+    artistExternalUrls: track.artists.map((a) => ({
+      spotify: a.external_urls?.spotify ?? null,
+    })),
+    trackExternalUrls: {
+      spotify: track.external_urls?.spotify ?? null,
+    },
+    trackExternalIds: {
+      isrc: track.external_ids?.isrc ?? null,
+    },
+    discNumber: track.disc_number,
+    trackNumber: track.track_number,
     playedAt: played_at,
     durationMs: track.duration_ms,
   };

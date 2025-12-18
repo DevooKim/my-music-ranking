@@ -5,7 +5,7 @@ export async function refreshAccessToken(): Promise<string> {
   const clientId = process.env.SPOTIFY_CLIENT_ID!;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET!;
   const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN!;
-  
+
   const response = await fetch(SPOTIFY_TOKEN_URL, {
     method: "POST",
     headers: {
@@ -17,28 +17,33 @@ export async function refreshAccessToken(): Promise<string> {
       refresh_token: refreshToken,
     }),
   });
-  
+
   if (!response.ok) {
     throw new Error(`Token refresh failed: ${response.status}`);
   }
-  
+
   const data = await response.json();
   return data.access_token;
 }
 
-export async function fetchRecentlyPlayed(accessToken: string, limit = 50): Promise<any> {
+export async function fetchRecentlyPlayed(
+  accessToken: string,
+  { limit = 50, after }: { limit?: number; after?: number } = {},
+): Promise<any> {
+  const query = after ? `?limit=${limit}&after=${after}` : `?limit=${limit}`;
+
   const response = await fetch(
-    `${SPOTIFY_API_URL}/me/player/recently-played?limit=${limit}`,
+    `${SPOTIFY_API_URL}/me/player/recently-played${query}`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
-    }
+    },
   );
-  
+
   if (!response.ok) {
     throw new Error(`Spotify API failed: ${response.status}`);
   }
-  
+
   return response.json();
 }

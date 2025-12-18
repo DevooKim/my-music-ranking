@@ -58,7 +58,7 @@ Resources:
         ScheduleEvent:
           Type: Schedule
           Properties:
-            Schedule: rate(2 hours)
+            Schedule: cron(0 0/2 * * ? *)
 
   # 매주 월요일: raw 병합 + 주간 차트 생성
   WeeklyProcessorFunction:

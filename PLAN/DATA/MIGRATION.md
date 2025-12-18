@@ -367,6 +367,13 @@ if (process.argv.includes("--dry-run")) {
 }
 ```
 
+#### ISRC 기반 메타데이터 정정 (추가)
+
+- 각 트랙의 `external_ids.isrc` 값을 이용해 Spotify Search API(`type=track`, `q=isrc:...`)를 조회한다.
+- 응답에서 최신 `album.name`, `album.artists`, `track.name`, `artists` 정보를 꺼내어 변환된 데이터에 반영한다.
+- 동일한 ISRC에 대해서는 캐시를 적용해 불필요한 API 호출을 방지한다.
+- 토큰(`SPOTIFY_TOKEN`) 또는 지역/언어(`SPOTIFY_MARKET`, `SPOTIFY_LOCALE`) 설정이 없으면 자동으로 fallback 하며 기존 레거시 데이터 그대로 사용한다.
+
 ### 3단계: 중복 제거 로직 추가
 
 **문제:** 기존 collector가 2시간마다 최근 50개를 가져오므로 중복 가능성 있음

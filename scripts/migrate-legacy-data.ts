@@ -3,8 +3,10 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { deduplicatePlayedItems } from "../lambda/shared/mapper";
 import type { PlayedItem, RawPlayedData } from "../lambda/shared/types";
 import { formatIsoWeekLabel, parseLegacyKey, buildRawObjectKey } from "./utils/legacy";
+import { decodeLegacyJson } from "./utils/encoding";
 import { BUCKET, DEFAULT_CONCURRENCY, LEGACY_PREFIX } from "./utils/config";
-import { getObjectBody, listAllKeys, s3Client } from "./utils/s3";
+import { getObjectBuffer, listAllKeys, s3Client } from "./utils/s3";
+import { fetchTrackMetadataByIsrc } from "./utils/spotify";
 
 interface LegacySpotifyItem {
   track: {
@@ -14,9 +16,17 @@ interface LegacySpotifyItem {
       id: string;
       name: string;
       images?: { url: string }[];
+      total_tracks?: number;
+      external_urls?: { spotify?: string };
     };
-    artists: { id: string; name: string }[];
+    artists: { id: string; name: string; external_urls?: { spotify?: string } }[];
     duration_ms: number;
+    disc_number?: number;
+    track_number?: number;
+    external_ids?: {
+      isrc?: string;
+    };
+    external_urls?: { spotify?: string };
   };
   played_at: string;
 }
@@ -39,6 +49,14 @@ interface CliOptions {
   concurrency: number;
   prefix: string;
 }
+
+const toExternalUrls = (url?: string | null) => ({
+  spotify: url ?? null,
+});
+
+const toExternalIds = (isrc?: string | null) => ({
+  isrc: isrc ?? null,
+});
 
 function parseArgs(): CliOptions {
   const args = process.argv.slice(2);
@@ -65,18 +83,72 @@ function parseArgs(): CliOptions {
   };
 }
 
-function buildItems(legacyItems: LegacySpotifyItem[]): PlayedItem[] {
-  return legacyItems.map((item) => ({
+async function mapLegacyItem(item: LegacySpotifyItem): Promise<PlayedItem> {
+  const albumExternalUrl = item.track.album.external_urls?.spotify ?? null;
+  const artistExternalUrls = item.track.artists.map((artist) => toExternalUrls(artist.external_urls?.spotify));
+
+  const base: PlayedItem = {
     trackId: item.track.id,
     trackName: item.track.name,
     albumId: item.track.album.id,
     albumName: item.track.album.name,
     albumImageUrl: item.track.album.images?.[0]?.url ?? "",
+    albumTotalTracks: item.track.album.total_tracks ?? 0,
+    albumExternalUrls: toExternalUrls(albumExternalUrl),
     artistIds: item.track.artists.map((artist) => artist.id),
     artistNames: item.track.artists.map((artist) => artist.name),
+    artistExternalUrls,
+    trackExternalUrls: toExternalUrls(item.track.external_urls?.spotify),
+    trackExternalIds: toExternalIds(item.track.external_ids?.isrc ?? null),
+    discNumber: item.track.disc_number ?? 0,
+    trackNumber: item.track.track_number ?? 0,
     playedAt: item.played_at,
     durationMs: item.track.duration_ms,
-  }));
+  };
+
+  const isrc = item.track.external_ids?.isrc;
+  if (!isrc) {
+    return base;
+  }
+
+  const enriched = await fetchTrackMetadataByIsrc(isrc);
+  if (!enriched) {
+    return base;
+  }
+
+  return {
+    ...base,
+    trackName: enriched.trackName || base.trackName,
+    albumName: enriched.albumName || base.albumName,
+    albumId: enriched.albumId || base.albumId,
+    albumImageUrl: enriched.albumImageUrl || base.albumImageUrl,
+    albumTotalTracks: enriched.albumTotalTracks ?? base.albumTotalTracks,
+    albumExternalUrls: enriched.albumExternalUrl
+      ? toExternalUrls(enriched.albumExternalUrl)
+      : base.albumExternalUrls,
+    artistIds: enriched.artistIds.length > 0 ? enriched.artistIds : base.artistIds,
+    artistNames: enriched.artistNames.length > 0 ? enriched.artistNames : base.artistNames,
+    artistExternalUrls:
+      enriched.artistExternalUrls && enriched.artistExternalUrls.length > 0
+        ? enriched.artistExternalUrls.map((url) => toExternalUrls(url))
+        : base.artistExternalUrls,
+    trackExternalUrls: enriched.trackExternalUrl
+      ? toExternalUrls(enriched.trackExternalUrl)
+      : base.trackExternalUrls,
+    trackExternalIds: enriched.trackExternalIds
+      ? toExternalIds(enriched.trackExternalIds)
+      : base.trackExternalIds,
+    discNumber: enriched.discNumber ?? base.discNumber,
+    trackNumber: enriched.trackNumber ?? base.trackNumber,
+  };
+}
+
+async function buildItems(legacyItems: LegacySpotifyItem[]): Promise<PlayedItem[]> {
+  const result: PlayedItem[] = [];
+  for (const legacyItem of legacyItems) {
+    result.push(await mapLegacyItem(legacyItem));
+  }
+  return result;
 }
 
 async function transformLegacyFile(key: string): Promise<TransformResult | null> {
@@ -86,19 +158,20 @@ async function transformLegacyFile(key: string): Promise<TransformResult | null>
     return null;
   }
 
-  const body = await getObjectBody(key);
-  if (!body) {
+  const buffer = await getObjectBuffer(key);
+  if (!buffer) {
     console.warn(`Empty file: ${key}`);
     return null;
   }
 
+  const body = decodeLegacyJson(buffer);
   const legacyData: LegacySpotifyData = JSON.parse(body);
   if (!Array.isArray(legacyData.items)) {
     console.warn(`Invalid payload: ${key}`);
     return null;
   }
 
-  const items = buildItems(legacyData.items);
+  const items = await buildItems(legacyData.items);
   const dedupedItems = deduplicatePlayedItems(items);
 
   const reference = legacyData.items[0]?.played_at
@@ -213,5 +286,5 @@ async function main(): Promise<void> {
 
 main().catch((error) => {
   console.error("Migration script failed:", error);
-  process.exit(1);
+//   process.exit(1);
 });

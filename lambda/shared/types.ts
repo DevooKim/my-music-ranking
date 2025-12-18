@@ -1,11 +1,26 @@
+export interface ExternalUrls {
+  spotify: string | null;
+}
+
+export interface ExternalIds {
+  isrc: string | null;
+}
+
 export interface PlayedItem {
   trackId: string;
   trackName: string;
   albumId: string;
   albumName: string;
   albumImageUrl: string;
+  albumTotalTracks: number;
+  albumExternalUrls: ExternalUrls;
   artistIds: string[];
   artistNames: string[];
+  artistExternalUrls: ExternalUrls[];
+  trackExternalUrls: ExternalUrls;
+  trackExternalIds: ExternalIds;
+  discNumber: number;
+  trackNumber: number;
   playedAt: string;
   durationMs: number;
 }

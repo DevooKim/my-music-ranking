@@ -1,3 +1,11 @@
+export interface ExternalUrls {
+  spotify: string | null;
+}
+
+export interface ExternalIds {
+  isrc: string | null;
+}
+
 // 개별 재생 기록
 export interface PlayedItem {
   trackId: string;
@@ -5,8 +13,15 @@ export interface PlayedItem {
   albumId: string;
   albumName: string;
   albumImageUrl: string;
+  albumTotalTracks: number;
+  albumExternalUrls: ExternalUrls;
   artistIds: string[];
   artistNames: string[];
+  artistExternalUrls: ExternalUrls[];
+  trackExternalUrls: ExternalUrls;
+  trackExternalIds: ExternalIds;
+  discNumber: number;
+  trackNumber: number;
   playedAt: string; // ISO 8601
   durationMs: number;
 }

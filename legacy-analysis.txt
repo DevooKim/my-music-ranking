@@ -1,0 +1,29 @@
+
+=== Legacy Data Analysis ===
+Bucket: my-music-ranking
+Prefix: spotify-recently-played/
+
+Found 1105 files.
+Date range: 2025-09-17T15:00:00.000Z -> 2025-12-18T14:00:00.000Z
+Week coverage: 14 unique weeks.
+  2025-W38: 49 files
+  2025-W39: 84 files
+  2025-W40: 84 files
+  2025-W41: 84 files
+  2025-W42: 83 files
+  2025-W43: 84 files
+  2025-W44: 84 files
+  2025-W45: 84 files
+  2025-W46: 84 files
+  2025-W47: 85 files
+  2025-W48: 84 files
+  2025-W49: 84 files
+  2025-W50: 84 files
+  2025-W51: 48 files
+
+=== Sample (5) ===
+- spotify-recently-played/2025091715.json: 50 items (2025-09-17T12:26:02.395Z .. 2025-09-16T10:52:05.414Z)
+- spotify-recently-played/2025091716.json: 50 items (2025-09-17T12:26:02.395Z .. 2025-09-16T10:52:05.414Z)
+- spotify-recently-played/2025091718.json: 50 items (2025-09-17T12:26:02.395Z .. 2025-09-16T10:52:05.414Z)
+- spotify-recently-played/2025091720.json: 50 items (2025-09-17T12:26:02.395Z .. 2025-09-16T10:52:05.414Z)
+- spotify-recently-played/2025091722.json: 50 items (2025-09-17T12:26:02.395Z .. 2025-09-16T10:52:05.414Z)

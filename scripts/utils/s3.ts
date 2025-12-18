@@ -32,12 +32,17 @@ export async function listAllKeys(prefix: string, options: ListKeysOptions = {})
   return keys;
 }
 
-export async function getObjectBody(key: string): Promise<string | null> {
+export async function getObjectBuffer(key: string): Promise<Buffer | null> {
   const response = await s3Client.send(new GetObjectCommand({
     Bucket: BUCKET,
     Key: key,
   }));
 
-  const body = await response.Body?.transformToString();
-  return body ?? null;
+  const byteArray = await response.Body?.transformToByteArray();
+  return byteArray ? Buffer.from(byteArray) : null;
+}
+
+export async function getObjectBody(key: string): Promise<string | null> {
+  const buffer = await getObjectBuffer(key);
+  return buffer ? buffer.toString("utf8") : null;
 }
