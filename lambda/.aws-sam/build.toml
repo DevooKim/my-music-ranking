@@ -18,6 +18,7 @@ Target = "es2022"
 Sourcemap = true
 EntryPoints = ["collector/handler.ts"]
 
+
 [function_build_definitions.332c712c-7be9-4600-9faa-b73fcf1c0201]
 codeuri = "/Users/hyunwookim/Dev/project/my-music-ranking/lambda"
 runtime = "nodejs22.x"
@@ -36,6 +37,7 @@ Target = "es2022"
 Sourcemap = true
 EntryPoints = ["weekly-processor/handler.ts"]
 
+
 [function_build_definitions.efa28dfd-92e6-42d1-b6da-00fca9eb329a]
 codeuri = "/Users/hyunwookim/Dev/project/my-music-ranking/lambda"
 runtime = "nodejs22.x"
@@ -53,5 +55,6 @@ Minify = true
 Target = "es2022"
 Sourcemap = true
 EntryPoints = ["monthly-processor/handler.ts"]
+
 
 [layer_build_definitions]

@@ -623,17 +623,21 @@ S3_REGION=ap-northeast-2
 
 ## 체크리스트
 
-- [ ] `lambda/collector/handler.ts` 생성
-- [ ] `lambda/weekly-processor/handler.ts` 생성
-- [ ] `lambda/monthly-processor/handler.ts` 생성
-- [ ] `lambda/shared/s3.ts` 생성
-- [ ] `lambda/shared/spotify.ts` 생성
-- [ ] `lambda/shared/chart.ts` 생성 (Phase 3 로직)
-- [ ] `lambda/shared/types.ts` 생성
-- [ ] `lambda/template.yaml` 생성
-- [ ] SAM 빌드 테스트
+- [x] `lambda/collector/handler.ts` 생성
+- [x] `lambda/weekly-processor/handler.ts` 생성
+- [x] `lambda/monthly-processor/handler.ts` 생성
+- [x] `lambda/shared/s3.ts` 생성
+- [x] `lambda/shared/spotify.ts` 생성
+- [x] `lambda/shared/mapper.ts` 생성
+- [x] `lambda/shared/chart.ts` 생성 (Phase 3 로직)
+- [x] `lambda/shared/chart/*.ts` 생성 (calculator, comparator, stats-manager, builder)
+- [x] `lambda/shared/types.ts` 생성
+- [x] `lambda/template.yaml` 생성
+- [x] `lambda/deploy.sh` 배포 스크립트 생성
+- [x] `lambda/.env.lambda.example` 환경변수 예제 생성
+- [x] SAM 빌드 테스트
 - [ ] SAM 로컬 테스트
-- [ ] AWS 배포
+- [x] AWS 배포
 
 ## 예상 소요 시간
 

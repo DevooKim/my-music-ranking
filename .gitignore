@@ -18,10 +18,11 @@
 /out/
 
 # aws sam / lambda
-/.aws-sam
+.aws-sam/
 /lambda/**/dist
 /lambda/**/node_modules
 /lambda/**/.esbuild
+samconfig.toml
 
 # production
 /build
@@ -38,6 +39,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.lambda.example
+lambda/.env.lambda
 
 # vercel
 .vercel

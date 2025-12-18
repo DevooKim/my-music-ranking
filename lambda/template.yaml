@@ -11,10 +11,14 @@ Globals:
     MemorySize: 256
     Environment:
       Variables:
-        S3_BUCKET: !Ref S3Bucket
+        S3_BUCKET: !Ref S3BucketName
         S3_REGION: !Ref AWS::Region
 
 Parameters:
+  S3BucketName:
+    Type: String
+    Default: my-music-ranking
+    Description: Existing S3 bucket name for storing music data
   SpotifyClientId:
     Type: String
     NoEcho: true
@@ -26,10 +30,6 @@ Parameters:
     NoEcho: true
 
 Resources:
-  S3Bucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: my-music-ranking
 
   # 2시간마다 Spotify 재생 기록 수집
   CollectorFunction:
@@ -53,7 +53,7 @@ Resources:
           SPOTIFY_REFRESH_TOKEN: !Ref SpotifyRefreshToken
       Policies:
         - S3WritePolicy:
-            BucketName: !Ref S3Bucket
+            BucketName: !Ref S3BucketName
       Events:
         ScheduleEvent:
           Type: Schedule
@@ -79,7 +79,7 @@ Resources:
       MemorySize: 512
       Policies:
         - S3CrudPolicy:
-            BucketName: !Ref S3Bucket
+            BucketName: !Ref S3BucketName
       Events:
         ScheduleEvent:
           Type: Schedule
@@ -106,7 +106,7 @@ Resources:
       MemorySize: 512
       Policies:
         - S3CrudPolicy:
-            BucketName: !Ref S3Bucket
+            BucketName: !Ref S3BucketName
       Events:
         ScheduleEvent:
           Type: Schedule
@@ -116,7 +116,7 @@ Resources:
 
 Outputs:
   S3BucketName:
-    Value: !Ref S3Bucket
+    Value: !Ref S3BucketName
   CollectorFunctionArn:
     Value: !GetAtt CollectorFunction.Arn
   WeeklyProcessorFunctionArn:
