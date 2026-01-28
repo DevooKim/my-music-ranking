@@ -1,11 +1,11 @@
-import { deduplicatePlayedItems } from "../lambda/shared/mapper";
-import type { ChartResponse, TrackStats, WeeklyPlayedData } from "../lambda/shared/types";
-import { buildChart } from "../lambda/shared/chart/builder";
-import { getS3Json, putS3Json, s3Paths } from "../lambda/shared/s3";
-import { formatIsoWeekLabel } from "./utils/legacy";
-import { fetchRawWeekData, listRawWeeks } from "./utils/raw-data";
-import type { IsoWeekTuple } from "./utils/iso-week";
-import { getIsoWeekEndDate, getIsoWeekStartDate, getPreviousIsoWeek } from "./utils/iso-week";
+import { deduplicatePlayedItems } from "../../lambda/shared/mapper";
+import type { ChartResponse, TrackStats, WeeklyPlayedData } from "../../lambda/shared/types";
+import { buildChart } from "../../lambda/shared/chart/builder";
+import { getS3Json, putS3Json, s3Paths } from "../../lambda/shared/s3";
+import { formatIsoWeekLabel } from "../utils/legacy";
+import { fetchRawWeekData, listRawWeeks } from "../utils/raw-data";
+import type { IsoWeekTuple } from "../utils/iso-week";
+import { getIsoWeekEndDate, getIsoWeekStartDate, getPreviousIsoWeek } from "../utils/iso-week";
 
 interface ParsedArgs {
   weekTokens?: string;

@@ -1,7 +1,7 @@
-import type { RawPlayedData } from "../lambda/shared/types";
-import { formatIsoWeekLabel, normalizedRawPrefix } from "./utils/legacy";
-import { LEGACY_PREFIX, DEFAULT_SAMPLE_SIZE } from "./utils/config";
-import { getObjectBody, listAllKeys } from "./utils/s3";
+import type { RawPlayedData } from "../../lambda/shared/types";
+import { formatIsoWeekLabel, normalizedRawPrefix } from "../utils/legacy";
+import { LEGACY_PREFIX, DEFAULT_SAMPLE_SIZE } from "../utils/config";
+import { getObjectBody, listAllKeys } from "../utils/s3";
 
 interface CliOptions {
   sampleSize: number;

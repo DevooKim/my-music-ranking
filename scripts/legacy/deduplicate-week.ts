@@ -1,9 +1,9 @@
-import { deduplicatePlayedItems } from "../lambda/shared/mapper";
-import type { WeeklyPlayedData } from "../lambda/shared/types";
-import { putS3Json, s3Paths } from "../lambda/shared/s3";
-import { formatIsoWeekLabel } from "./utils/legacy";
-import { fetchRawWeekData } from "./utils/raw-data";
-import { getIsoWeekEndDate, getIsoWeekStartDate } from "./utils/iso-week";
+import { deduplicatePlayedItems } from "../../lambda/shared/mapper";
+import type { WeeklyPlayedData } from "../../lambda/shared/types";
+import { putS3Json, s3Paths } from "../../lambda/shared/s3";
+import { formatIsoWeekLabel } from "../utils/legacy";
+import { fetchRawWeekData } from "../utils/raw-data";
+import { getIsoWeekEndDate, getIsoWeekStartDate } from "../utils/iso-week";
 
 interface CliOptions {
   isoYear: number;

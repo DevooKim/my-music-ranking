@@ -1,8 +1,8 @@
 import { getISOWeek, getISOWeekYear } from "date-fns";
-import type { LegacyKeyInfo } from "./utils/legacy";
-import { formatIsoWeekLabel, parseLegacyKey } from "./utils/legacy";
-import { BUCKET, DEFAULT_SAMPLE_SIZE, LEGACY_PREFIX } from "./utils/config";
-import { getObjectBody, listAllKeys } from "./utils/s3";
+import type { LegacyKeyInfo } from "../utils/legacy";
+import { formatIsoWeekLabel, parseLegacyKey } from "../utils/legacy";
+import { BUCKET, DEFAULT_SAMPLE_SIZE, LEGACY_PREFIX } from "../utils/config";
+import { getObjectBody, listAllKeys } from "../utils/s3";
 
 interface LegacySpotifyData {
   items?: Array<{ played_at?: string }>;

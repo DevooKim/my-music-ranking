@@ -1,12 +1,12 @@
 import { parseISO, isValid, getISOWeek, getISOWeekYear } from "date-fns";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { deduplicatePlayedItems } from "../lambda/shared/mapper";
-import type { PlayedItem, RawPlayedData } from "../lambda/shared/types";
-import { formatIsoWeekLabel, parseLegacyKey, buildRawObjectKey } from "./utils/legacy";
-import { decodeLegacyJson } from "./utils/encoding";
-import { BUCKET, DEFAULT_CONCURRENCY, LEGACY_PREFIX } from "./utils/config";
-import { getObjectBuffer, listAllKeys, s3Client } from "./utils/s3";
-import { fetchTrackMetadataByIsrc } from "./utils/spotify";
+import { deduplicatePlayedItems } from "../../lambda/shared/mapper";
+import type { PlayedItem, RawPlayedData } from "../../lambda/shared/types";
+import { formatIsoWeekLabel, parseLegacyKey, buildRawObjectKey } from "../utils/legacy";
+import { decodeLegacyJson } from "../utils/encoding";
+import { BUCKET, DEFAULT_CONCURRENCY, LEGACY_PREFIX } from "../utils/config";
+import { getObjectBuffer, listAllKeys, s3Client } from "../utils/s3";
+import { fetchTrackMetadataByIsrc } from "../utils/spotify";
 
 interface LegacySpotifyItem {
   track: {
