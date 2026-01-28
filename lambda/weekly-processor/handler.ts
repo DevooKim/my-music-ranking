@@ -1,11 +1,7 @@
-import { S3Client, PutObjectCommand, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getISOWeek, getISOWeekYear, subWeeks, startOfISOWeek, endOfISOWeek, format } from "date-fns";
+import { getISOWeek, getISOWeekYear, subWeeks, startOfISOWeek, endOfISOWeek } from "date-fns";
 import { buildChart } from "../shared/chart";
 import { s3Paths, getS3Json, putS3Json } from "../shared/s3";
-import type { RawPlayedData, WeeklyPlayedData, PlayedItem, ChartResponse, TrackStats } from "../shared/types";
-
-const s3 = new S3Client({ region: process.env.S3_REGION || "ap-northeast-2" });
-const BUCKET = process.env.S3_BUCKET || "my-music-ranking";
+import type { RawPlayedData, ChartResponse, TrackStats } from "../shared/types";
 
 export const handler = async (): Promise<void> => {
   const now = new Date();
@@ -21,27 +17,23 @@ export const handler = async (): Promise<void> => {
   console.log(`Processing ${periodLabel}`);
   
   try {
-    // 1. Raw 파일 병합 → Weekly 저장
-    const weeklyItems = await mergeRawFiles(isoYear, isoWeek);
+    // 1. Raw 파일 읽기 (단일 파일)
+    const rawData = await getS3Json<RawPlayedData>(s3Paths.raw(isoYear, isoWeek));
     
-    const weeklyData: WeeklyPlayedData = {
-      isoYear,
-      isoWeek,
-      startDate: format(startDate, "yyyy-MM-dd"),
-      endDate: format(endDate, "yyyy-MM-dd"),
-      totalCount: weeklyItems.length,
-      items: weeklyItems,
-    };
+    if (!rawData || rawData.items.length === 0) {
+      console.log("No raw data found for this week");
+      return;
+    }
     
-    await putS3Json(s3Paths.weekly(isoYear, isoWeek), weeklyData);
-    console.log(`Saved weekly data: ${weeklyItems.length} items`);
+    const weeklyItems = rawData.items;
+    console.log(`Loaded ${weeklyItems.length} items from raw data`);
     
     // 2. 지난주 차트 읽기 (LW 계산용)
     const prevWeek = subWeeks(lastWeek, 1);
     const prevIsoYear = getISOWeekYear(prevWeek);
     const prevIsoWeek = getISOWeek(prevWeek);
     const lastChart = await getS3Json<ChartResponse>(
-      s3Paths.chartWeekly(prevIsoYear, prevIsoWeek)
+      s3Paths.weeklyProcessed(prevIsoYear, prevIsoWeek)
     );
     
     // 3. track-stats.json 읽기
@@ -64,7 +56,7 @@ export const handler = async (): Promise<void> => {
     });
     
     // 5. 차트 저장
-    await putS3Json(s3Paths.chartWeekly(isoYear, isoWeek), chart);
+    await putS3Json(s3Paths.weeklyProcessed(isoYear, isoWeek), chart);
     console.log(`Saved weekly chart: ${chart.items.length} items`);
     
     // 6. track-stats 업데이트
@@ -76,48 +68,3 @@ export const handler = async (): Promise<void> => {
     throw error;
   }
 };
-
-async function mergeRawFiles(isoYear: number, isoWeek: number): Promise<PlayedItem[]> {
-  const prefix = `played/raw/${isoYear}/${String(isoWeek).padStart(2, "0")}/`;
-  
-  const listResult = await s3.send(new ListObjectsV2Command({
-    Bucket: BUCKET,
-    Prefix: prefix,
-  }));
-  
-  if (!listResult.Contents || listResult.Contents.length === 0) {
-    console.log("No raw files found");
-    return [];
-  }
-  
-  const allItems: PlayedItem[] = [];
-  
-  for (const obj of listResult.Contents) {
-    if (!obj.Key) continue;
-    
-    const getResult = await s3.send(new GetObjectCommand({
-      Bucket: BUCKET,
-      Key: obj.Key,
-    }));
-    
-    const bodyString = await getResult.Body?.transformToString();
-    if (!bodyString) continue;
-    
-    const rawData: RawPlayedData = JSON.parse(bodyString);
-    allItems.push(...rawData.items);
-  }
-  
-  // 중복 제거
-  const seen = new Set<string>();
-  const deduped = allItems.filter((item) => {
-    const key = `${item.trackId}-${item.playedAt}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  
-  // 시간순 정렬
-  return deduped.sort((a, b) => 
-    new Date(a.playedAt).getTime() - new Date(b.playedAt).getTime()
-  );
-}

@@ -1,7 +1,7 @@
-import { subMonths, startOfMonth, endOfMonth, format, eachWeekOfInterval, getISOWeek, getISOWeekYear } from "date-fns";
+import { subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getISOWeek, getISOWeekYear } from "date-fns";
 import { buildChart } from "../shared/chart";
 import { s3Paths, getS3Json, putS3Json } from "../shared/s3";
-import type { WeeklyPlayedData, PlayedItem, ChartResponse, TrackStats } from "../shared/types";
+import type { RawPlayedData, PlayedItem, ChartResponse, TrackStats } from "../shared/types";
 
 export const handler = async (): Promise<void> => {
   const now = new Date();
@@ -17,7 +17,7 @@ export const handler = async (): Promise<void> => {
   console.log(`Processing monthly chart: ${periodLabel}`);
   
   try {
-    // 1. 해당 월의 모든 weekly 파일 읽기
+    // 1. 해당 월에 걸쳐있는 모든 주차의 raw 파일 읽기
     const weeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 });
     const allItems: PlayedItem[] = [];
     
@@ -25,13 +25,13 @@ export const handler = async (): Promise<void> => {
       const isoYear = getISOWeekYear(weekStart);
       const isoWeek = getISOWeek(weekStart);
       
-      const weeklyData = await getS3Json<WeeklyPlayedData>(
-        s3Paths.weekly(isoYear, isoWeek)
+      const rawData = await getS3Json<RawPlayedData>(
+        s3Paths.raw(isoYear, isoWeek)
       );
       
-      if (weeklyData) {
-        // 해당 월의 데이터만 필터링
-        const filtered = weeklyData.items.filter((item) => {
+      if (rawData) {
+        // 해당 월의 데이터만 필터링 (played_at 기준)
+        const filtered = rawData.items.filter((item) => {
           const playedDate = new Date(item.playedAt);
           return playedDate >= startDate && playedDate <= endDate;
         });
@@ -39,12 +39,17 @@ export const handler = async (): Promise<void> => {
       }
     }
     
-    console.log(`Loaded ${allItems.length} items from weekly files`);
+    console.log(`Loaded ${allItems.length} items from raw files`);
+    
+    if (allItems.length === 0) {
+      console.log("No items found for this month");
+      return;
+    }
     
     // 2. 지난달 차트 읽기 (LM 계산용)
     const prevMonth = subMonths(lastMonth, 1);
     const lastChart = await getS3Json<ChartResponse>(
-      s3Paths.chartMonthly(prevMonth.getFullYear(), prevMonth.getMonth() + 1)
+      s3Paths.monthlyProcessed(prevMonth.getFullYear(), prevMonth.getMonth() + 1)
     );
     
     // 3. track-stats.json 읽기
@@ -67,7 +72,7 @@ export const handler = async (): Promise<void> => {
     });
     
     // 5. 차트 저장
-    await putS3Json(s3Paths.chartMonthly(year, month), chart);
+    await putS3Json(s3Paths.monthlyProcessed(year, month), chart);
     console.log(`Saved monthly chart: ${chart.items.length} items`);
     
     // 6. track-stats 업데이트

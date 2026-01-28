@@ -26,10 +26,14 @@ export interface PlayedItem {
 }
 
 export interface RawPlayedData {
-  collectedAt: string;
   isoYear: number;
   isoWeek: number;
   items: PlayedItem[];
+}
+
+export interface NextMetadata {
+  next: string | null;
+  updatedAt: string;
 }
 
 export interface WeeklyPlayedData {

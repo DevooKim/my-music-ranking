@@ -52,8 +52,12 @@ Resources:
           SPOTIFY_CLIENT_SECRET: !Ref SpotifyClientSecret
           SPOTIFY_REFRESH_TOKEN: !Ref SpotifyRefreshToken
       Policies:
-        - S3WritePolicy:
+        - S3CrudPolicy:
             BucketName: !Ref S3BucketName
+        - Statement:
+            - Effect: Allow
+              Action: s3:ListBucket
+              Resource: !Sub arn:aws:s3:::${S3BucketName}
       Events:
         ScheduleEvent:
           Type: Schedule
@@ -80,6 +84,10 @@ Resources:
       Policies:
         - S3CrudPolicy:
             BucketName: !Ref S3BucketName
+        - Statement:
+            - Effect: Allow
+              Action: s3:ListBucket
+              Resource: !Sub arn:aws:s3:::${S3BucketName}
       Events:
         ScheduleEvent:
           Type: Schedule
@@ -107,12 +115,16 @@ Resources:
       Policies:
         - S3CrudPolicy:
             BucketName: !Ref S3BucketName
+        - Statement:
+            - Effect: Allow
+              Action: s3:ListBucket
+              Resource: !Sub arn:aws:s3:::${S3BucketName}
       Events:
         ScheduleEvent:
           Type: Schedule
           Properties:
             # 매월 1일 01:00 KST (전날 16:00 UTC)
-            Schedule: cron(0 16 L * ? *)
+            Schedule: cron(0 16 1 * ? *)
 
 Outputs:
   S3BucketName:

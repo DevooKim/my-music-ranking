@@ -1,5 +1,5 @@
 {
-  "name": "collector",
+  "name": "lambda-functions",
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "esbuild": "^0.24.2",
+    "esbuild": "^0.27.2",
     "typescript": "^5.0.0"
   }
 }
