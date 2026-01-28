@@ -1,5 +1,21 @@
 import type { PlayedItem, ChartItem } from "../types";
 
+// playedAt 타임스탬프 + trackId 조합으로 중복 제거
+function removeDuplicatePlayedItems(items: PlayedItem[]): PlayedItem[] {
+  const seen = new Map<string, PlayedItem>();
+  
+  for (const item of items) {
+    const timestamp = new Date(item.playedAt).getTime();
+    const compositeKey = `${timestamp}-${item.trackId}`;
+    
+    if (!seen.has(compositeKey)) {
+      seen.set(compositeKey, item);
+    }
+  }
+  
+  return Array.from(seen.values());
+}
+
 export interface AggregatedTrack {
   trackId: string;
   trackName: string;
@@ -13,9 +29,13 @@ export interface AggregatedTrack {
 }
 
 export function aggregatePlays(items: PlayedItem[]): AggregatedTrack[] {
+  // 1단계: 중복 재생 기록 제거
+  const dedupedItems = removeDuplicatePlayedItems(items);
+  
+  // 2단계: trackId별로 집계
   const map = new Map<string, AggregatedTrack>();
 
-  for (const item of items) {
+  for (const item of dedupedItems) {
     const existing = map.get(item.trackId);
     if (existing) {
       existing.playCount++;
