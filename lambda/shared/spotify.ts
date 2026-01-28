@@ -37,6 +37,7 @@ export async function fetchRecentlyPlayed(
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        'accept-language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
       },
     },
   );
