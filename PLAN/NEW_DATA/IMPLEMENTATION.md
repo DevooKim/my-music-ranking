@@ -261,16 +261,42 @@ export function groupByWeek(items: PlayedItem[]): Map<string, PlayedItem[]> {
   - 주차별로 파일 병합
   - 중복 제거 적용
 
-- [ ] **Weekly 차트 마이그레이션**
-  - 기존: `played/charts/weekly/{year}/week-{week}.json` → 신규: `processed/weekly/{YYYY}/weekly-week-{nn}.json`
-  - 데이터 구조 유지 (ChartResponse)
+- [ ] **Weekly 차트 재생성** (Raw 데이터 기반)
+  - 마이그레이션된 Raw 데이터(`raw/{YYYY}/raw-week-{nn}.json`)로부터 새로 계산
+  - `buildChart()` 함수를 사용하여 ChartResponse 생성
+  - 저장 경로: `processed/weekly/{YYYY}/weekly-week-{nn}.json`
+  - 시간순으로 처리하여 lastRank 정확하게 계산
 
-- [ ] **Monthly 차트 마이그레이션**
-  - 기존: `played/charts/monthly/{year}/month-{month}.json` → 신규: `processed/monthly/{YYYY}/monthly-month-{nn}.json`
-  - 데이터 구조 유지 (ChartResponse)
+- [ ] **Monthly 차트 재생성** (Raw 데이터 기반)
+  - 마이그레이션된 Raw 데이터에서 월별 items 필터링하여 새로 계산
+  - `buildChart()` 함수를 사용하여 ChartResponse 생성
+  - 저장 경로: `processed/monthly/{YYYY}/monthly-month-{nn}.json`
+  - 시간순으로 처리하여 lastRank 정확하게 계산
 
-- [ ] **메타데이터 마이그레이션**
-  - 기존: `played/stats/track-stats.json` → 신규: `metadata/track-stats.json`
+- [ ] **track-stats 재생성**
+  - Weekly/Monthly 차트 재생성 과정에서 track-stats도 함께 재계산
+  - 저장 경로: `metadata/track-stats.json`
+
+#### 재생성 플로우
+```
+1. Raw 데이터 마이그레이션 (주차별 병합 + 중복 제거 + 한국어 메타데이터 변환)
+2. Weekly 차트 재생성:
+   a. 모든 raw 파일을 시간순(isoYear, isoWeek)으로 정렬
+   b. 각 주차별로 buildChart() 호출
+   c. 이전 주 차트를 참조하여 lastRank 계산
+   d. track-stats 누적 업데이트
+3. Monthly 차트 재생성:
+   a. 각 월에 해당하는 raw items 필터링
+   b. 월별로 buildChart() 호출
+   c. 이전 달 차트를 참조하여 lastRank 계산
+   d. track-stats 누적 업데이트
+4. 최종 track-stats 저장
+```
+
+#### 장점
+- 한국어 메타데이터가 적용된 상태로 차트 생성
+- 기존 차트 데이터의 잠재적 오류/불일치 해소
+- 새로운 차트 계산 로직이 일관되게 적용됨
 
 ### 5.2 한국어 메타데이터 변환 (ISRC 기반)
 **파일**: `scripts/migrate-korean-metadata.ts`
@@ -305,7 +331,6 @@ curl --location 'https://api.spotify.com/v1/search?q=isrc%3A{ISRC_CODE}&type=tra
 
 - [ ] **마이그레이션 스크립트에 통합**
   - Raw 데이터 마이그레이션 시 한국어 메타데이터로 변환
-  - 기존 차트 데이터도 한국어 메타데이터로 업데이트
 
 #### 구현 예시
 ```typescript

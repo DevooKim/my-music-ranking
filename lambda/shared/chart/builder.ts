@@ -19,6 +19,7 @@ interface BuildChartInput {
   };
   lastChart: ChartResponse | null;
   trackStats: TrackStats;
+  limit?: number;
 }
 
 interface BuildChartResult {
@@ -27,13 +28,13 @@ interface BuildChartResult {
 }
 
 export function buildChart(input: BuildChartInput): BuildChartResult {
-  const { items, chartType, period, lastChart, trackStats } = input;
+  const { items, chartType, period, lastChart, trackStats, limit } = input;
   
   // 1. 집계
   const aggregated = aggregatePlays(items);
   
   // 2. 순위 부여
-  const ranked = assignRanks(aggregated);
+  const ranked = assignRanks(aggregated, limit);
   
   // 3. 지난 차트와 비교
   const withLastRank = compareWithLastChart(ranked, lastChart);

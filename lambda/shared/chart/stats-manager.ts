@@ -33,6 +33,7 @@ export function updateTrackStats(
         yearlyPeakPeriod: chartType === "yearly" ? Number(period) : 0,
         totalYearsOnChart: chartType === "yearly" ? 1 : 0,
 
+        totalPlayedCount: item.playCount,
         trackName: item.trackName,
         artistNames: item.artistNames,
       };
@@ -65,6 +66,7 @@ export function updateTrackStats(
       // 트랙 메타 업데이트
       existing.trackName = item.trackName;
       existing.artistNames = item.artistNames;
+      existing.totalPlayedCount += item.playCount;
     }
   }
   

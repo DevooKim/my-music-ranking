@@ -48,3 +48,5 @@ lambda/.env.lambda
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+data/spotify-raw/*

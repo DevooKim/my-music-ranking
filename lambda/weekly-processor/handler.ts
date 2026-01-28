@@ -52,7 +52,6 @@ export const handler = async (): Promise<void> => {
       },
       lastChart,
       trackStats,
-      limit: 100,
     });
     
     // 5. 차트 저장

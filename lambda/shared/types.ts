@@ -86,6 +86,7 @@ export interface TrackStats {
     yearlyPeakRank: number;
     yearlyPeakPeriod: number;
     totalYearsOnChart: number;
+    totalPlayedCount: number;
     trackName: string;
     artistNames: string[];
   };
