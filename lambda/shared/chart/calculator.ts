@@ -58,8 +58,8 @@ export function aggregatePlays(items: PlayedItem[]): AggregatedTrack[] {
   return Array.from(map.values()).sort((a, b) => b.playCount - a.playCount);
 }
 
-export function assignRanks(aggregated: AggregatedTrack[], limit = 100): Omit<ChartItem, "lastRank" | "peakRank" | "weeksOnChart">[] {
-  return aggregated.slice(0, limit).map((item, index) => ({
+export function assignRanks(aggregated: AggregatedTrack[]): Omit<ChartItem, "lastRank" | "peakRank" | "weeksOnChart">[] {
+  return aggregated.map((item, index) => ({
     rank: index + 1,
     trackId: item.trackId,
     trackName: item.trackName,

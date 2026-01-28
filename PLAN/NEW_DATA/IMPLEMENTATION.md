@@ -272,12 +272,87 @@ export function groupByWeek(items: PlayedItem[]): Map<string, PlayedItem[]> {
 - [ ] **메타데이터 마이그레이션**
   - 기존: `played/stats/track-stats.json` → 신규: `metadata/track-stats.json`
 
+### 5.2 한국어 메타데이터 변환 (ISRC 기반)
+**파일**: `scripts/migrate-korean-metadata.ts`
+
+#### 배경
+- Spotify API의 기본 응답은 영문 메타데이터를 반환하는 경우가 있음
+- 예: `"JAMONG SALGU CLUB"` → `"자몽살구클럽"`
+- ISRC 코드를 이용해 한국 마켓 기준으로 재검색하여 한국어 메타데이터 획득
+
+#### API 호출 방식
+```sh
+curl --location 'https://api.spotify.com/v1/search?q=isrc%3A{ISRC_CODE}&type=track&limit=1&market=KR' \
+--header 'accept-language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7' \
+--header 'Authorization: Bearer {TOKEN}'
+```
+
+#### 작업 내용
+- [ ] **ISRC 기반 트랙 검색 함수 구현**
+  - `isrc` 코드로 Spotify Search API 호출
+  - `market=KR` 및 `accept-language: ko-KR` 헤더 설정
+  
+- [ ] **메타데이터 교체 대상 필드**
+  - `track.album.artists` - 앨범 아티스트 목록
+  - `track.album.name` - 앨범명
+  - `track.artists` - 트랙 아티스트 목록
+  - `track.name` - 트랙명
+
+- [ ] **ISRC 기반 캐싱 구현**
+  - 동일 ISRC에 대한 중복 API 호출 방지
+  - 메모리 캐시 또는 로컬 파일 캐시 사용
+  - 캐시 키: `isrc` 코드
+
+- [ ] **마이그레이션 스크립트에 통합**
+  - Raw 데이터 마이그레이션 시 한국어 메타데이터로 변환
+  - 기존 차트 데이터도 한국어 메타데이터로 업데이트
+
+#### 구현 예시
+```typescript
+interface KoreanMetadataCache {
+  [isrc: string]: {
+    albumArtists: Artist[];
+    albumName: string;
+    artists: Artist[];
+    trackName: string;
+  };
+}
+
+async function fetchKoreanMetadata(isrc: string, token: string): Promise<KoreanMetadata | null> {
+  const url = `https://api.spotify.com/v1/search?q=isrc%3A${isrc}&type=track&limit=1&market=KR`;
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'accept-language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+    }
+  });
+  
+  const data = await response.json();
+  const track = data.tracks?.items?.[0];
+  
+  if (!track) return null;
+  
+  return {
+    albumArtists: track.album.artists,
+    albumName: track.album.name,
+    artists: track.artists,
+    trackName: track.name
+  };
+}
+```
+
+#### 주의사항
+- Spotify API Rate Limit 고려 (429 에러 핸들링)
+- ISRC가 없는 트랙은 원본 유지
+- 검색 결과가 없는 경우 원본 유지
+
 #### 마이그레이션 검증
 - [ ] 마이그레이션 전후 데이터 건수 비교
 - [ ] 샘플 데이터 무결성 검증
 - [ ] 기존 S3 경로와 신규 경로 병행 운영 (1주일)
+- [ ] 한국어 메타데이터 변환 결과 샘플 검증
 
-### 5.2 롤백 계획
+### 5.3 롤백 계획
 - [ ] 마이그레이션 전 전체 S3 백업
 - [ ] 롤백 스크립트 작성
 - [ ] 테스트 환경에서 먼저 검증

@@ -79,7 +79,10 @@ export const handler = async (): Promise<void> => {
     }
 
     // 8. next 메타데이터 업데이트
-    const newNextUrl = spotifyData.next || buildAfterUrl(requestTimestamp);
+    const afterCursor = spotifyData.cursors?.after;
+    const newNextUrl = afterCursor
+      ? buildAfterUrl(Number(afterCursor))
+      : buildAfterUrl(requestTimestamp);
     await putS3Json(s3Paths.nextMetadata(), {
       next: newNextUrl,
       updatedAt: new Date().toISOString(),

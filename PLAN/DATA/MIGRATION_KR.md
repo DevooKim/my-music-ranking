@@ -88,7 +88,7 @@
 ```sh
 curl --location 'https://api.spotify.com/v1/search?q=isrc%3AKRMIM2540757&type=track&limit=1&market=KR' \
 --header 'accept-language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7' \
---header 'Authorization: Bearer BQAJP31jeyPE0DBrO4KMo9mnvAnkMaC9GBxcmMC9mkgEzmyx_5wuWvDoIWL8UKzhJ4wO1px8Inzc2_MxQCNgGliwxI_BUPSmV1HX9CTBossc2OBkOZemDbzmJpXjIAAspFmmqbJOO3lW-U1UREdtGotoPAoReNVwLflZHd0ng5_MHJAwTc8nbMj2imkD-yjg0TSUTak-rzwWdh1GR-NONRh3UGFSgf5-ZxWolRI9qiS3hDRhdgvKG75r04g'
+--header 'Authorization: Bearer {TOKEN}'
 ```
 
 - `isrc` 코드로 트랙을 검색
