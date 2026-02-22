@@ -109,3 +109,37 @@
 - 처리본 미존재 구간이 일부 존재할 수 있으므로 not-found 재확인 정책을 반드시 유지한다.
 - 연간 데이터는 존재 여부는 런타임 조회로 판단한다.
 - 과거 기간 전체 사전 SSG(빌드 시) 생성을 적용하지 않는다.
+
+## 8) raw 수집 주기 기반 캐시 정렬(2시간 기준)
+
+### 8.1 수집 주기
+- Lambda `CollectorFunction` 스케줄: `cron(0 0/2 * * ? *)`
+- 수집 주기 변수: `SPOTIFY_RAW_COLLECTION_INTERVAL_SECONDS`
+  - 기본값: `7200`초(2시간)
+
+### 8.2 정책 수식
+- `latest`(현재 주차 처리본 존재 시, 최신 캐시):
+  - `latest_found.maxAge = clamp( R / 2, 600, 3600 )`
+  - `latest_found.swr = latest_found.maxAge`
+  - 기본값( R = 7200 ) → `3600`
+- `latest_not_found`(현재 주차 미생성/미준비 시 404):
+  - `latest_not_found.maxAge = clamp( R / 12, 60, 600 )`
+  - `latest_not_found.swr = clamp( R / 60, 30, 120 )`
+  - 기본값( R = 7200 ) → `600 / 120`
+- `found` / `not_found`는 기존 규칙 유지(과거 라우트 동작 변경 없음).
+
+### 8.3 환경변수 오버라이드(기본값 대체)
+- `CHART_LATEST_CACHE_MAX_AGE_SECONDS` (default: `3600`)
+- `CHART_LATEST_CACHE_SWR_SECONDS` (default: `3600`)
+- `CHART_LATEST_NOT_FOUND_CACHE_MAX_AGE_SECONDS` (default: `600`)
+- `CHART_LATEST_NOT_FOUND_CACHE_SWR_SECONDS` (default: `120`)
+- 기존 과거 정책 변수:
+  - `CHART_FOUND_CACHE_MAX_AGE_SECONDS`
+  - `CHART_FOUND_CACHE_SWR_SECONDS`
+  - `CHART_NOT_FOUND_CACHE_MAX_AGE_SECONDS`
+  - `CHART_NOT_FOUND_CACHE_SWR_SECONDS`
+
+### 8.4 주차 경계 동작 기대
+- 월요일 00:30 전환 직후에 `GET /api/charts/weekly/latest`는 새 주차의 처리본 존재 유무를 반영.
+- 처리본 미생성일 때는 `Cache-Control: public, max-age=600, stale-while-revalidate=120` 기본값이 적용.
+- 처리본 존재 시에는 `Cache-Control: public, max-age=3600, stale-while-revalidate=3600` 기본값이 적용.

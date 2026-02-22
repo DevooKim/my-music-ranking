@@ -37,13 +37,24 @@ const buildNotReady = (payload: Omit<NotReadyChartResponse, "generatedAt">): Cha
   cachePolicy: getCachePolicy("not_found"),
 });
 
+const buildLatestNotReady = (
+  payload: Omit<NotReadyChartResponse, "generatedAt">,
+): ChartNotFoundResult => ({
+  kind: "not_found",
+  response: {
+    ...payload,
+    generatedAt: new Date().toISOString(),
+  },
+  cachePolicy: getCachePolicy("latest_not_found"),
+});
+
 export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
   const period = getCurrentWeekPeriod();
   try {
     const chart = await getWeeklyChartFromS3(period.isoYear, period.isoWeek);
 
     if (!chart) {
-      return buildNotReady({
+      return buildLatestNotReady({
         status: "not_ready",
         type: "weekly",
         period,

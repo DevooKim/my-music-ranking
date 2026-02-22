@@ -109,3 +109,26 @@
 4. 캐시 테스트
    1. live 응답이 짧은 TTL로 갱신되는지
    2. 과거 page 404 캐시 회수 시간
+
+## raw 수집 주기(2시간) 기반 캐시 정렬
+
+- Collector 수집 주기: `cron(0 0/2 * * ? *)` (2시간 = `7200`초)
+- `latest` 정책은 과거 규칙과 분리해 동적 계산한다.
+- 기본 규칙(환경변수 오버라이드 가능):
+  - `latest_found.maxAge = clamp(7200 / 2, 600, 3600) = 3600`
+  - `latest_found.swr = 3600`
+  - `latest_not_found.maxAge = clamp(7200 / 12, 60, 600) = 600`
+  - `latest_not_found.swr = clamp(7200 / 60, 30, 120) = 120`
+- 과거 조회는 기존:
+  - found: 기본 30일
+  - not_found: 120초 + 600초 SWR
+- 적용 가능한 환경변수:
+  - `SPOTIFY_RAW_COLLECTION_INTERVAL_SECONDS`
+  - `CHART_LATEST_CACHE_MAX_AGE_SECONDS`
+  - `CHART_LATEST_CACHE_SWR_SECONDS`
+  - `CHART_LATEST_NOT_FOUND_CACHE_MAX_AGE_SECONDS`
+  - `CHART_LATEST_NOT_FOUND_CACHE_SWR_SECONDS`
+  - `CHART_FOUND_CACHE_MAX_AGE_SECONDS`
+  - `CHART_FOUND_CACHE_SWR_SECONDS`
+  - `CHART_NOT_FOUND_CACHE_MAX_AGE_SECONDS`
+  - `CHART_NOT_FOUND_CACHE_SWR_SECONDS`
