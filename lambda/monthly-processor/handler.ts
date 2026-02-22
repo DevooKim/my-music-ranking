@@ -1,10 +1,17 @@
 import { subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getISOWeek, getISOWeekYear } from "date-fns";
+import { TZDate } from "@date-fns/tz";
 import { buildChart } from "../shared/chart";
 import { s3Paths, getS3Json, putS3Json } from "../shared/s3";
 import type { RawPlayedData, PlayedItem, ChartResponse, TrackStats } from "../shared/types";
 
+const KOREA_TIMEZONE = "Asia/Seoul";
+
+function toKstDate(isoString: string): TZDate {
+  return new TZDate(isoString, KOREA_TIMEZONE);
+}
+
 export const handler = async (): Promise<void> => {
-  const now = new Date();
+  const now = new TZDate(new Date(), KOREA_TIMEZONE);
   
   // 지난 달 정보
   const lastMonth = subMonths(now, 1);
@@ -32,7 +39,7 @@ export const handler = async (): Promise<void> => {
       if (rawData) {
         // 해당 월의 데이터만 필터링 (played_at 기준)
         const filtered = rawData.items.filter((item) => {
-          const playedDate = new Date(item.playedAt);
+          const playedDate = toKstDate(item.playedAt);
           return playedDate >= startDate && playedDate <= endDate;
         });
         allItems.push(...filtered);

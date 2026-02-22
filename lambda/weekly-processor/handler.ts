@@ -1,10 +1,13 @@
 import { getISOWeek, getISOWeekYear, subWeeks, startOfISOWeek, endOfISOWeek } from "date-fns";
+import { TZDate } from "@date-fns/tz";
 import { buildChart } from "../shared/chart";
 import { s3Paths, getS3Json, putS3Json } from "../shared/s3";
 import type { RawPlayedData, ChartResponse, TrackStats } from "../shared/types";
 
+const KOREA_TIMEZONE = "Asia/Seoul";
+
 export const handler = async (): Promise<void> => {
-  const now = new Date();
+  const now = new TZDate(new Date(), KOREA_TIMEZONE);
   
   // 지난 주 정보 계산
   const lastWeek = subWeeks(now, 1);
