@@ -77,10 +77,20 @@ function getDeduplicationKey(item: PlayedItem): string {
 // KST 기준 ISO Week 계산
 function getKstIsoWeek(playedAt: string): { isoYear: number; isoWeek: number } {
   const utcDate = parseISO(playedAt);
-  const kstDate = new Date(utcDate.getTime() + 9 * 60 * 60 * 1000);
+  // UTC 시간에 9시간을 더해서 KST로 변환
+  const kstMs = utcDate.getTime() + 9 * 60 * 60 * 1000;
+  const kstDate = new Date(kstMs);
+  
+  // KST 날짜의 년/월/일을 추출하여 UTC 기준 Date 객체 생성
+  // (date-fns 함수들이 로컬 시간대를 사용하기 때문)
+  const kstYear = kstDate.getUTCFullYear();
+  const kstMonth = kstDate.getUTCMonth();
+  const kstDay = kstDate.getUTCDate();
+  const localKstDate = new Date(kstYear, kstMonth, kstDay);
+  
   return {
-    isoYear: getISOWeekYear(kstDate),
-    isoWeek: getISOWeek(kstDate),
+    isoYear: getISOWeekYear(localKstDate),
+    isoWeek: getISOWeek(localKstDate),
   };
 }
 
