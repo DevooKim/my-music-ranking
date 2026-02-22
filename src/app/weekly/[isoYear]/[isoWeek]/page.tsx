@@ -1,5 +1,5 @@
 import { getWeekPeriod, moveWeekPeriod } from "@/lib/charts/period";
-import { getWeeklyChart } from "@/lib/charts/service";
+import { getCurrentPeriods, getWeeklyChart } from "@/lib/charts/service";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
 import { notFound } from "next/navigation";
 
@@ -26,6 +26,7 @@ export default async function WeeklyDetailPage({
   const period = getWeekPeriod(year, week);
   const previous = moveWeekPeriod(period, -1);
   const next = moveWeekPeriod(period, 1);
+  const current = getCurrentPeriods();
 
   const result = await getWeeklyChart(year, week);
 
@@ -34,6 +35,8 @@ export default async function WeeklyDetailPage({
       title={`주간 랭킹 ${period.isoYear}-W${String(period.isoWeek).padStart(2, "0")}`}
       description={`기간: ${period.start} ~ ${period.end}`}
       result={result}
+      periods={current}
+      activeScope="weekly"
       previousHref={`/weekly/${previous.isoYear}/${String(previous.isoWeek).padStart(2, "0")}`}
       nextHref={`/weekly/${next.isoYear}/${String(next.isoWeek).padStart(2, "0")}`}
     />

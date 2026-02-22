@@ -1,5 +1,5 @@
 import { getYearPeriod, moveYearPeriod } from "@/lib/charts/period";
-import { getYearlyChart } from "@/lib/charts/service";
+import { getCurrentPeriods, getYearlyChart } from "@/lib/charts/service";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
 import { notFound } from "next/navigation";
 
@@ -24,6 +24,7 @@ export default async function YearlyDetailPage({
   const period = getYearPeriod(parsedYear);
   const previous = moveYearPeriod(period, -1);
   const next = moveYearPeriod(period, 1);
+  const current = getCurrentPeriods();
 
   const result = await getYearlyChart(parsedYear);
 
@@ -32,6 +33,8 @@ export default async function YearlyDetailPage({
       title={`연간 랭킹 ${period.year}`}
       description={`기간: ${period.start} ~ ${period.end}`}
       result={result}
+      periods={current}
+      activeScope="yearly"
       previousHref={`/yearly/${previous.year}`}
       nextHref={`/yearly/${next.year}`}
     />

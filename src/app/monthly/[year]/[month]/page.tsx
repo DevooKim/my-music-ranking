@@ -1,5 +1,5 @@
 import { getMonthPeriod, moveMonthPeriod } from "@/lib/charts/period";
-import { getMonthlyChart } from "@/lib/charts/service";
+import { getCurrentPeriods, getMonthlyChart } from "@/lib/charts/service";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
 import { notFound } from "next/navigation";
 
@@ -26,6 +26,7 @@ export default async function MonthlyDetailPage({
   const period = getMonthPeriod(parsedYear, parsedMonth);
   const previous = moveMonthPeriod(period, -1);
   const next = moveMonthPeriod(period, 1);
+  const current = getCurrentPeriods();
 
   const result = await getMonthlyChart(parsedYear, parsedMonth);
 
@@ -34,6 +35,8 @@ export default async function MonthlyDetailPage({
       title={`월간 랭킹 ${period.year}-${String(period.month).padStart(2, "0")}`}
       description={`기간: ${period.start} ~ ${period.end}`}
       result={result}
+      periods={current}
+      activeScope="monthly"
       previousHref={`/monthly/${previous.year}/${String(previous.month).padStart(2, "0")}`}
       nextHref={`/monthly/${next.year}/${String(next.month).padStart(2, "0")}`}
     />
