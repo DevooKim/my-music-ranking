@@ -10,7 +10,10 @@ export const ServiceWorkerRegister = () => {
 
     const register = async () => {
       try {
-        await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+        await navigator.serviceWorker.register("/sw.js", {
+          scope: "/",
+          updateViaCache: "none",
+        });
       } catch {
         // Registering service worker is best-effort in this app.
       }
@@ -34,4 +37,3 @@ export const ServiceWorkerRegister = () => {
 
   return null;
 };
-

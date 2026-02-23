@@ -68,9 +68,16 @@ export const ChartPageContent = ({
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <Link
             href="/"
-            className="text-xs font-medium uppercase tracking-[0.24em] text-[#b7ffe0] sm:text-sm"
+            className="flex items-center gap-3"
           >
-            My music Ranking
+            <img
+              src="/logo.svg"
+              alt="My Music Ranking logo"
+              className="h-9 w-auto flex-none sm:h-10"
+            />
+            <span className="text-sm font-semibold tracking-[0.12em] text-[#b7ffe0] sm:text-base">
+              My Music Ranking
+            </span>
           </Link>
           <nav className="grid w-full grid-cols-3 gap-2 text-xs sm:flex sm:w-auto sm:gap-2 sm:text-sm">
             <Link

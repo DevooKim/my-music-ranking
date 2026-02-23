@@ -1,12 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="My Music Ranking app icon">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#111827" />
-      <stop offset="100%" stop-color="#0b1020" />
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#22c55e"/>
     </linearGradient>
   </defs>
-  <rect x="0" y="0" width="192" height="192" rx="32" fill="url(#bg)" />
-  <circle cx="96" cy="96" r="64" fill="#1ed760" opacity="0.22" />
-  <path d="M62 129V63c0-4.4 5.1-6.8 8.4-4.2l54.6 31.9c3.4 2 3.4 7 0 8.9l-54.6 32c-3.3 1.9-8.4 0-8.4-3.8V80.8L122 96V129" fill="#e5f4f0"/>
-</svg>
 
+  <rect width="512" height="512" rx="128" fill="#02060e"/>
+  <rect x="40" y="40" width="432" height="432" rx="100" fill="none" stroke="#0f172a" stroke-width="24"/>
+
+  <g transform="scale(0.78) translate(70 120)" fill="none" stroke="url(#accent)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M136 258c0-92 54-148 120-148s120 56 120 148" stroke-width="30"/>
+    <rect x="101" y="258" width="70" height="132" rx="35" stroke-width="30"/>
+    <rect x="341" y="258" width="70" height="132" rx="35" stroke-width="30"/>
+  </g>
+
+  <path
+    d="M176 390V226c0-10 12-14 18-6l72 104c4 6 12 6 16 0l72-104c6-8 18-4 18 6v164"
+    fill="none"
+    stroke="#e2e8f0"
+    stroke-width="30"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

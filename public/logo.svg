@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="My Music Ranking logo">
+  <defs>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#22c55e"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="120" fill="#02060e"/>
+
+  <g fill="none" stroke="url(#accent)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M136 258c0-92 54-148 120-148s120 56 120 148" stroke-width="30"/>
+    <rect x="102" y="258" width="64" height="126" rx="28" stroke-width="30"/>
+    <rect x="346" y="258" width="64" height="126" rx="28" stroke-width="30"/>
+  </g>
+
+  <path
+    d="M160 390V226
+       c0-10 12-14 18-6l72 102c4 6 12 6 16 0l72-102c6-8 18-4 18 6v168"
+    fill="none"
+    stroke="#F8FAFC"
+    stroke-width="28"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

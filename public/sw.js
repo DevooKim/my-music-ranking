@@ -1,8 +1,10 @@
-const SHELL_CACHE = "my-music-ranking-shell-v1";
+const SHELL_CACHE = "my-music-ranking-shell-v2";
 
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
+  "/pwa-192.png",
+  "/pwa-512.png",
   "/pwa-192.svg",
   "/pwa-512.svg",
   "/favicon.ico",
