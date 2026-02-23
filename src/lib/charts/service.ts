@@ -4,6 +4,7 @@ import {
   getCurrentYearPeriod,
   getMonthPeriod,
   type WeekPeriod,
+  moveWeekPeriod,
   getWeekPeriod,
   getYearPeriod,
 } from "@/lib/charts/period";
@@ -76,7 +77,7 @@ const toChartFromRawWeekly = (raw: RawPlayedDataLike, period: WeekPeriod): Chart
     });
   });
 
-  const items = Array.from(aggregated.values())
+  const rankedItems = Array.from(aggregated.values())
     .sort((a, b) => {
       if (b.playCount !== a.playCount) {
         return b.playCount - a.playCount;
@@ -106,8 +107,77 @@ const toChartFromRawWeekly = (raw: RawPlayedDataLike, period: WeekPeriod): Chart
       isoWeek: period.isoWeek,
     },
     generatedAt: new Date().toISOString(),
-    items,
+    items: rankedItems,
   };
+};
+
+const applyRawWeeklyHistory = (
+  chart: ChartResponse,
+  previousWeekChart: ChartResponse | null,
+): ChartResponse => {
+  if (!previousWeekChart) {
+    return {
+      ...chart,
+      items: chart.items.map((item) => ({
+        ...item,
+        lastRank: null,
+        peakRank: item.rank,
+        weeksOnChart: 1,
+      })),
+    };
+  }
+
+  const previousByTrack = new Map<
+    string,
+    { rank: number; peakRank: number | null; weeksOnChart: number | null }
+  >();
+
+  previousWeekChart.items.forEach((item) => {
+    previousByTrack.set(item.trackId, {
+      rank: item.rank,
+      peakRank: item.peakRank,
+      weeksOnChart: item.weeksOnChart,
+    });
+  });
+
+  return {
+    ...chart,
+    items: chart.items.map((item) => {
+      const previous = previousByTrack.get(item.trackId);
+      if (!previous) {
+        return {
+          ...item,
+          lastRank: null,
+          peakRank: item.rank,
+          weeksOnChart: 1,
+        };
+      }
+
+      const previousPeak = previous.peakRank ?? item.rank;
+      const previousWeeks = previous.weeksOnChart ?? 0;
+
+      return {
+        ...item,
+        lastRank: previous.rank,
+        peakRank: Math.min(previousPeak, item.rank),
+        weeksOnChart: previousWeeks + 1,
+      };
+    }),
+  };
+};
+
+const getPreviousWeekChartForRaw = async (
+  period: WeekPeriod,
+): Promise<ChartResponse | null> => {
+  const previous = moveWeekPeriod(period, -1);
+
+  const previousProcessed = await getWeeklyChartFromS3(previous.isoYear, previous.isoWeek);
+  if (previousProcessed) return previousProcessed;
+
+  const previousRaw = await getWeeklyRawChartFromS3(previous.isoYear, previous.isoWeek);
+  if (!previousRaw || previousRaw.items.length === 0) return null;
+
+  return toChartFromRawWeekly(previousRaw, previous);
 };
 
 const buildError = (type: "weekly" | "monthly" | "yearly", message: string): ChartErrorResult => ({
@@ -145,9 +215,11 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
     if (!chart) {
       const rawChart = await getWeeklyRawChartFromS3(period.isoYear, period.isoWeek);
       if (rawChart && rawChart.items.length > 0) {
+        const previousWeekChart = await getPreviousWeekChartForRaw(period);
+        const latestRawChart = applyRawWeeklyHistory(toChartFromRawWeekly(rawChart, period), previousWeekChart);
         return {
           kind: "found",
-          chart: toChartFromRawWeekly(rawChart, period),
+          chart: latestRawChart,
           cachePolicy: getCachePolicy("latest"),
         } satisfies ChartFoundResult;
       }

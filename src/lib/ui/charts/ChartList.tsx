@@ -31,17 +31,16 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
             const item = items[virtualRow.index];
             const lastRankText = item.lastRank === null ? "NEW" : `${item.lastRank}`;
             const peakText = item.peakRank === null ? "-" : `${item.peakRank}`;
-            const weeksText = item.weeksOnChart === null ? "-" : `WEEKS ${item.weeksOnChart}`;
             const coverUrl =
               item.albumImageUrl && item.albumImageUrl.length > 0
                 ? item.albumImageUrl
                 : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='12' fill='%232a3343'/%3E%3Cpath d='M33 28h30c2.8 0 5 2.2 5 5v25.4c-2.4-1.4-5.2-2.2-8.2-2.2-7.7 0-14 6.3-14 14s6.3 14 14 14c7.7 0 14-6.3 14-14V33c0-1.5-1.5-2.8-3.3-2.8H33c-1.8 0-3.3 1.3-3.3 2.8v30c0 1.5 1.5 2.8 3.3 2.8h1.5V28z' fill='%237af0a6'/%3E%3C/svg%3E";
 
-            return (
-              <li
-                key={item.trackId}
-                className="absolute left-0 flex w-full items-center gap-4 rounded-xl border border-white/10 bg-[#0e121b] px-4 py-3"
-                style={{
+        return (
+          <li
+            key={item.trackId}
+            className="absolute left-0 flex w-full items-center gap-4 rounded-xl border border-white/10 bg-[#0e121b] px-4 py-3"
+            style={{
                   top: virtualRow.start,
                   transform: "translateY(0px)",
                   height: `${virtualRow.size ?? ITEM_HEIGHT}px`,
@@ -65,8 +64,18 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
                   <p className="font-semibold text-white">재생 {item.playCount.toLocaleString("ko-KR")}회</p>
                 </div>
                 <div className="w-32 text-right text-[11px] text-[#7af0a6]">{weeksText}</div>
-                <div className="w-28 text-right text-[11px] font-medium text-[#d1dce9]">
-                  LW {lastRankText} · PEAK {peakText}
+                <div className="w-40 text-right text-[11px] text-[#d1dce9]">
+                  <div className="mb-1 flex items-center justify-end gap-2">
+                    {item.lastRank === null ? (
+                      <span className="rounded-full bg-[#1ed760] px-2 py-0.5 text-[10px] font-bold text-[#04100a]">
+                        NEW
+                      </span>
+                    ) : (
+                      <span className="font-medium">LW {lastRankText}</span>
+                    )}
+                    <span className="font-medium">PEAK {peakText}</span>
+                  </div>
+                  <div className="text-[10px] text-[#7b8494]">WEEKS {item.weeksOnChart ?? "-"}</div>
                 </div>
               </li>
             );
