@@ -1,12 +1,13 @@
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-
 const bucketName =
   process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || "my-music-ranking";
 const region =
-  process.env.S3_REGION ||
-  "ap-northeast-2";
+  process.env.S3_REGION || "ap-northeast-2";
 
-const s3 = new S3Client({ region });
+const buildPublicS3Url = (key: string): string =>
+  `https://s3.${region}.amazonaws.com/${bucketName}/${key
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
 
 const pad2 = (value: number): string => String(value).padStart(2, "0");
 
@@ -22,21 +23,28 @@ export const chartS3Keys = {
 
 const isNotFoundError = (error: unknown): boolean => {
   const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-  return e?.name === "NoSuchKey" || e?.$metadata?.httpStatusCode === 404;
+  return (
+    e?.name === "NoSuchKey" ||
+    e?.name === "NotFound" ||
+    e?.$metadata?.httpStatusCode === 404
+  );
 };
 
 export const getJsonFromS3 = async <T>(key: string): Promise<T | null> => {
   try {
-    const result = await s3.send(
-      new GetObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-      }),
-    );
+    const response = await fetch(buildPublicS3Url(key), {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+      },
+    });
 
-    if (!result.Body) return null;
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`S3 fetch failed: ${response.status} ${response.statusText}`);
+    }
 
-    const rawText = await result.Body.transformToString();
+    const rawText = await response.text();
     if (!rawText) return null;
 
     return JSON.parse(rawText) as T;
