@@ -65,29 +65,29 @@ export const ChartPageContent = ({
   return (
     <>
       <header className="sticky top-0 z-10 border-b border-white/10 bg-[#0b1020]/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4">
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <Link
             href="/"
-            className="text-sm font-medium uppercase tracking-[0.28em] text-[#b7ffe0]"
+            className="text-xs font-medium uppercase tracking-[0.24em] text-[#b7ffe0] sm:text-sm"
           >
             My music Ranking
           </Link>
-          <nav className="flex gap-2 text-sm">
+          <nav className="grid w-full grid-cols-3 gap-2 text-xs sm:flex sm:w-auto sm:gap-2 sm:text-sm">
             <Link
               href="/"
-              className={`rounded-full px-4 py-1.5 ${activeScope === "weekly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"}`}
+              className={`rounded-full px-2.5 py-1.5 text-center ${activeScope === "weekly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"} sm:px-4`}
             >
               주간
             </Link>
             <Link
               href={`/monthly/${periods.monthly.year}/${String(periods.monthly.month).padStart(2, "0")}`}
-              className={`rounded-full px-4 py-1.5 ${activeScope === "monthly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"}`}
+              className={`rounded-full px-2.5 py-1.5 text-center ${activeScope === "monthly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"} sm:px-4`}
             >
               월간
             </Link>
             <Link
               href={`/yearly/${periods.yearly.year}`}
-              className={`rounded-full px-4 py-1.5 ${activeScope === "yearly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"}`}
+              className={`rounded-full px-2.5 py-1.5 text-center ${activeScope === "yearly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"} sm:px-4`}
             >
               연간
             </Link>
@@ -95,9 +95,9 @@ export const ChartPageContent = ({
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10">
+      <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:gap-6 sm:py-10">
         <header className="space-y-2">
-          <h1 className="text-4xl font-bold leading-tight text-white">
+          <h1 className="text-3xl font-bold leading-tight text-white sm:text-4xl">
             {title}
           </h1>
           {result.kind === "found" ? (
