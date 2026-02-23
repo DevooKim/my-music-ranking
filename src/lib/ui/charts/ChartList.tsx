@@ -5,7 +5,10 @@ import type { ChartItem } from "@/lib/charts/types";
 
 /* eslint-disable @next/next/no-img-element */
 
+const MOBILE_BREAKPOINT = 640;
 const ITEM_HEIGHT = 98;
+const ITEM_HEIGHT_MOBILE = 78;
+const ITEM_GAP_MOBILE = 10;
 
 const toEntryStatusText = (status: ChartItem["entryStatus"]) => {
   if (status === "new") return "NEW";
@@ -24,11 +27,15 @@ const toStatusClassName = (status: ChartItem["entryStatus"]) => {
 };
 
 export const ChartList = ({ items }: { items: ChartItem[] }) => {
+  const isMobile =
+    typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
+
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () =>
       typeof document === "undefined" ? null : document.documentElement,
-    estimateSize: () => ITEM_HEIGHT,
+    estimateSize: () =>
+      isMobile ? ITEM_HEIGHT_MOBILE + ITEM_GAP_MOBILE : ITEM_HEIGHT,
     overscan: 6,
   });
 
@@ -44,7 +51,7 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
   }
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-[#111827]/70 p-2">
+    <section className="rounded-2xl border border-white/10 bg-[#111827]/70 p-2 sm:p-3">
       <ol
         className="relative w-full px-1"
         style={{ height: `${virtualizer.getTotalSize()}px` }}
@@ -70,15 +77,21 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
               : rankDelta > 0
                 ? "text-[#1ed760]"
                 : "text-[#f97373]";
+          const rowSize = virtualRow.size ??
+            (isMobile ? ITEM_HEIGHT_MOBILE + ITEM_GAP_MOBILE : ITEM_HEIGHT);
+          const visualHeight = isMobile
+            ? Math.max(56, rowSize - ITEM_GAP_MOBILE)
+            : rowSize;
+          const topOffset = isMobile ? ITEM_GAP_MOBILE / 2 : 0;
 
           return (
             <li
               key={item.trackId}
-              className="absolute left-0 flex w-full items-center gap-4 rounded-xl border border-white/10 bg-[#0e121b] px-4 py-3"
+              className="absolute left-0 flex w-full items-center gap-2 rounded-xl border border-white/10 bg-[#0e121b] px-2.5 py-2 sm:gap-4 sm:px-4 sm:py-3"
               style={{
-                top: virtualRow.start,
+                top: `${virtualRow.start + topOffset}px`,
                 transform: "translateY(0px)",
-                height: `${virtualRow.size ?? ITEM_HEIGHT}px`,
+                height: `${visualHeight}px`,
               }}
             >
               <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1ed760] text-sm font-bold text-[#04100a]">
@@ -88,26 +101,51 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
               <img
                 src={coverUrl}
                 alt={item.albumName || item.trackName}
-                className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                className="h-10 w-10 shrink-0 rounded-lg object-cover sm:h-12 sm:w-12"
                 loading="lazy"
               />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-white">
+                <p className="truncate text-sm font-bold text-[#eef2fb] sm:text-base">
                   {item.trackName}
                 </p>
-                <p className="truncate text-xs text-[#9ca3af]">
+                <p className="truncate text-xs font-semibold text-[#a4bbd9]">
                   {item.artistNames.join(", ")}
                 </p>
-                <p className="mt-0.5 truncate text-xs text-[#b0c2dd]">
+                <p className="mt-0.5 truncate text-xs text-[#9ca3af]">
                   {item.albumName}
                 </p>
               </div>
-              <div className="text-right text-xs text-[#9ca3af]">
+              <div className="w-auto text-left text-xs text-[#9ca3af] sm:hidden">
+                <p className="truncate text-[11px] font-semibold text-white">
+                  재생 {item.playCount.toLocaleString("ko-KR")}회
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  {statusText ? (
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${toStatusClassName(item.entryStatus)}`}
+                    >
+                      {statusText}
+                    </span>
+                  ) : null}
+                  {rankDeltaText ? (
+                    <span
+                      className={`truncate text-[10px] font-medium ${deltaClass}`}
+                    >
+                      {rankDeltaText}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#7b8494]">
+                  <span className="font-medium text-[#d1dce9]">PEAK {peakText}</span>
+                  <span>WEEKS {item.weeksOnChart ?? "-"}</span>
+                </div>
+              </div>
+              <div className="hidden text-right text-xs text-[#9ca3af] sm:block">
                 <p className="font-semibold text-white">
                   재생 {item.playCount.toLocaleString("ko-KR")}회
                 </p>
               </div>
-              <div className="w-44 text-right text-[11px] text-[#d1dce9]">
+              <div className="hidden w-44 text-right text-[11px] text-[#d1dce9] sm:block">
                 <div className="mb-2 flex items-center justify-end gap-2">
                   {statusText ? (
                     <span

@@ -1,0 +1,25 @@
+{
+  "name": "Spotify 재생 랭킹",
+  "short_name": "Music Ranking",
+  "description": "주간/월간/연간 Spotify 재생 랭킹을 빠르게 확인할 수 있는 앱",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#02060e",
+  "theme_color": "#02060e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/pwa-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
