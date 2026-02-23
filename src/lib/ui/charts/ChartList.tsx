@@ -63,7 +63,6 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
                 <div className="text-right text-xs text-[#9ca3af]">
                   <p className="font-semibold text-white">재생 {item.playCount.toLocaleString("ko-KR")}회</p>
                 </div>
-                <div className="w-32 text-right text-[11px] text-[#7af0a6]">{weeksText}</div>
                 <div className="w-40 text-right text-[11px] text-[#d1dce9]">
                   <div className="mb-1 flex items-center justify-end gap-2">
                     {item.lastRank === null ? (
