@@ -6,6 +6,7 @@ const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "ap-n
 const s3 = new S3Client({ region });
 
 const pad2 = (value: number): string => String(value).padStart(2, "0");
+const isDev = process.env.NODE_ENV === "development";
 
 export const chartS3Keys = {
   rawWeek: (isoYear: number, isoWeek: number) =>
@@ -23,6 +24,10 @@ const isNotFoundError = (error: unknown): boolean => {
 };
 
 export const getJsonFromS3 = async <T>(key: string): Promise<T | null> => {
+  if (isDev) {
+    console.log(`[S3 GET] key=${key}`);
+  }
+
   try {
     const result = await s3.send(
       new GetObjectCommand({
@@ -31,6 +36,10 @@ export const getJsonFromS3 = async <T>(key: string): Promise<T | null> => {
       }),
     );
 
+    if (isDev) {
+      console.log(`[S3 GET SUCCESS] key=${key}, byteLength=${result.ContentLength ?? "unknown"}`);
+    }
+
     if (!result.Body) return null;
 
     const rawText = await result.Body.transformToString();
@@ -38,6 +47,11 @@ export const getJsonFromS3 = async <T>(key: string): Promise<T | null> => {
 
     return JSON.parse(rawText) as T;
   } catch (error) {
+    if (isDev) {
+      const err = error as { name?: string };
+      console.log(`[S3 GET ERROR] key=${key} error=${err?.name || "unknown"}`);
+    }
+
     if (isNotFoundError(error)) return null;
     throw error;
   }
