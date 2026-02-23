@@ -66,10 +66,11 @@ export const ChartPageContent = ({
     <>
       <header className="sticky top-0 z-10 border-b border-white/10 bg-[#0b1020]/80 backdrop-blur">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4">
-          <Link href="/" className="inline-block">
-            <p className="text-sm font-medium uppercase tracking-[0.28em] text-[#b7ffe0]">
-              Your music flow
-            </p>
+          <Link
+            href="/"
+            className="text-sm font-medium uppercase tracking-[0.28em] text-[#b7ffe0]"
+          >
+            Your music flow
           </Link>
           <nav className="flex gap-2 text-sm">
             <Link
