@@ -81,12 +81,14 @@ export const ChartPageContent = ({
           <h1 className="text-4xl font-bold leading-tight text-white">
             {title}
           </h1>
-          <p className="text-sm text-[#b6c2d1]">{description}</p>
           {result.kind === "found" ? (
-            <p className="text-xs text-[#9ca3af]">
-              총 {result.chart.items.length.toLocaleString("ko-KR")}곡
+            <p className="text-sm text-[#b6c2d1]">
+              {description} · 총{" "}
+              {result.chart.items.length.toLocaleString("ko-KR")}곡
             </p>
-          ) : null}
+          ) : (
+            <p className="text-sm text-[#b6c2d1]">{description}</p>
+          )}
         </header>
 
         <div className="flex flex-wrap gap-2">
