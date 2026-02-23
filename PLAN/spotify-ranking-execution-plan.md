@@ -165,4 +165,22 @@
   - `bun run lambda/tools/rebuild-processed.ts --scope all --from 2025-W38 --dry-run`
   - `bun run lambda/tools/rebuild-processed.ts --scope weekly --from 2025-W38 --to 2026-W52`
 - 추가:
-  - `--list-raw-weeks`로 현재 S3 raw 주차 목록 확인 후 실행 범위를 검증.
+- `--list-raw-weeks`로 현재 S3 raw 주차 목록 확인 후 실행 범위를 검증.
+
+## 10) 신규진입/재진입 상태 필드 반영(최종 실행 항목)
+
+### 10.1 변경 요약
+- `ChartItem`에 `entryStatus: "new" | "reentry" | null` 추가.
+  - `lambda/shared/types.ts`
+  - `src/lib/charts/types.ts`
+  - `src/lib/types/played.ts`
+- `lambda/shared/chart/builder.ts`에서 `lastRank === null` 항목을 기준으로 신규 진입 판정
+  - 과거 통계(`track-stats`)가 없으면 `new`
+  - 과거 통계가 있으면 `reentry`
+
+### 10.2 실행
+- 1) 타입 반영 커밋
+- 2) `bun run lambda/tools/rebuild-processed.ts --scope all --from 2025-W38 --to 2026-W09`
+- 3) 샘플 정합성 체크(예: w38~w40, w09)
+  - `lastRank === null` 개수와 `entryStatus` 분포 일치
+  - 재진입 건수에서 track-stats 이전 집계(총 주차 수)와 모순 없음

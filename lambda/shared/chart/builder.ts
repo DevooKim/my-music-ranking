@@ -27,6 +27,19 @@ interface BuildChartResult {
   updatedStats: TrackStats;
 }
 
+const getPreviousPeriodCount = (
+  trackStats: TrackStats,
+  trackId: string,
+  chartType: ChartType,
+): number => {
+  const stats = trackStats[trackId];
+  if (!stats) return 0;
+
+  if (chartType === "weekly") return stats.totalWeeksOnChart;
+  if (chartType === "monthly") return stats.totalMonthsOnChart;
+  return stats.totalYearsOnChart;
+};
+
 export function buildChart(input: BuildChartInput): BuildChartResult {
   const { items, chartType, period, lastChart, trackStats, limit } = input;
   
@@ -54,11 +67,16 @@ export function buildChart(input: BuildChartInput): BuildChartResult {
       item.trackId,
       chartType
     );
+    const previousPeriods = getPreviousPeriodCount(trackStats, item.trackId, chartType);
+    const entryStatus = item.lastRank === null
+      ? previousPeriods > 0 ? "reentry" : "new"
+      : null;
     
     return {
       ...item,
       peakRank: Math.min(peakRank, item.rank),
       weeksOnChart: periodsOnChart,
+      entryStatus,
     };
   });
   

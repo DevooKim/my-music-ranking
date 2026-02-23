@@ -96,6 +96,7 @@ const toChartFromRawWeekly = (raw: RawPlayedDataLike, period: WeekPeriod): Chart
       lastRank: null,
       peakRank: null,
       weeksOnChart: null,
+      entryStatus: null,
     }));
 
   return {

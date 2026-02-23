@@ -9,6 +9,8 @@ export interface CachePolicyInfo {
   cacheControl: string;
 }
 
+export type ChartEntryStatus = "new" | "reentry";
+
 export interface ChartPeriod {
   start: string;
   end: string;
@@ -32,6 +34,7 @@ export interface ChartItem {
   lastRank: number | null;
   peakRank: number | null;
   weeksOnChart: number | null;
+  entryStatus: ChartEntryStatus | null;
 }
 
 export interface ChartResponse {
