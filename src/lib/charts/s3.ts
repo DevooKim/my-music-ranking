@@ -8,6 +8,8 @@ const s3 = new S3Client({ region });
 const pad2 = (value: number): string => String(value).padStart(2, "0");
 
 export const chartS3Keys = {
+  rawWeek: (isoYear: number, isoWeek: number) =>
+    `raw/${isoYear}/raw-week-${pad2(isoWeek)}.json`,
   weekly: (isoYear: number, isoWeek: number) =>
     `processed/weekly/${isoYear}/weekly-week-${pad2(isoWeek)}.json`,
   monthly: (year: number, month: number) =>

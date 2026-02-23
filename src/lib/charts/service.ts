@@ -3,10 +3,12 @@ import {
   getCurrentWeekPeriod,
   getCurrentYearPeriod,
   getMonthPeriod,
+  type WeekPeriod,
   getWeekPeriod,
   getYearPeriod,
 } from "@/lib/charts/period";
 import type {
+  ChartResponse,
   ChartErrorResult,
   ChartFoundResult,
   ChartNotFoundResult,
@@ -16,9 +18,97 @@ import type {
 import { getCachePolicy } from "@/lib/charts/cache-policy";
 import {
   getMonthlyChartFromS3,
+  getWeeklyRawChartFromS3,
   getWeeklyChartFromS3,
   getYearlyChartFromS3,
+  type RawPlayedDataLike,
 } from "@/lib/charts/repository";
+
+type RawPlayedItem = RawPlayedDataLike["items"][number] & {
+  trackName?: string;
+  albumId?: string;
+  albumName?: string;
+  albumImageUrl?: string;
+  artistIds?: unknown;
+  artistNames?: unknown;
+  durationMs?: unknown;
+};
+
+const toChartFromRawWeekly = (raw: RawPlayedDataLike, period: WeekPeriod): ChartResponse => {
+  const aggregated = new Map<string, {
+    trackId: string;
+    trackName: string;
+    albumId: string;
+    albumName: string;
+    albumImageUrl: string;
+    artistIds: string[];
+    artistNames: string[];
+    playCount: number;
+    totalDurationMs: number;
+  }>();
+
+  (raw.items as RawPlayedItem[]).forEach((item) => {
+    if (!item.trackId || !item.trackName || !item.albumId || !item.albumName || !item.albumImageUrl) {
+      return;
+    }
+
+    const duration = Number(item.durationMs ?? 0);
+
+    const previous = aggregated.get(item.trackId);
+    if (previous) {
+      previous.playCount += 1;
+      previous.totalDurationMs += Number.isFinite(duration) ? duration : 0;
+      return;
+    }
+
+    aggregated.set(item.trackId, {
+      trackId: item.trackId,
+      trackName: item.trackName,
+      albumId: item.albumId,
+      albumName: item.albumName,
+      albumImageUrl: item.albumImageUrl,
+      artistIds: Array.isArray(item.artistIds) ? item.artistIds.filter((x): x is string => typeof x === "string") : [],
+      artistNames: Array.isArray(item.artistNames)
+        ? item.artistNames.filter((x): x is string => typeof x === "string")
+        : [],
+      playCount: 1,
+      totalDurationMs: Number.isFinite(duration) ? duration : 0,
+    });
+  });
+
+  const items = Array.from(aggregated.values())
+    .sort((a, b) => {
+      if (b.playCount !== a.playCount) {
+        return b.playCount - a.playCount;
+      }
+
+      if (b.totalDurationMs !== a.totalDurationMs) {
+        return b.totalDurationMs - a.totalDurationMs;
+      }
+
+      return a.trackName.localeCompare(b.trackName, "en");
+    })
+    .slice(0, 100)
+    .map<ChartResponse["items"][number]>((entry, index) => ({
+      ...entry,
+      rank: index + 1,
+      lastRank: null,
+      peakRank: null,
+      weeksOnChart: null,
+    }));
+
+  return {
+    type: "weekly",
+    period: {
+      start: period.start,
+      end: period.end,
+      isoYear: period.isoYear,
+      isoWeek: period.isoWeek,
+    },
+    generatedAt: new Date().toISOString(),
+    items,
+  };
+};
 
 const buildError = (type: "weekly" | "monthly" | "yearly", message: string): ChartErrorResult => ({
   kind: "error",
@@ -52,8 +142,16 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
   const period = getCurrentWeekPeriod();
   try {
     const chart = await getWeeklyChartFromS3(period.isoYear, period.isoWeek);
-
     if (!chart) {
+      const rawChart = await getWeeklyRawChartFromS3(period.isoYear, period.isoWeek);
+      if (rawChart && rawChart.items.length > 0) {
+        return {
+          kind: "found",
+          chart: toChartFromRawWeekly(rawChart, period),
+          cachePolicy: getCachePolicy("latest"),
+        } satisfies ChartFoundResult;
+      }
+
       return buildLatestNotReady({
         status: "not_ready",
         type: "weekly",
@@ -81,6 +179,15 @@ export const getWeeklyChart = async (
   try {
     const chart = await getWeeklyChartFromS3(isoYear, isoWeek);
     if (!chart) {
+      const rawChart = await getWeeklyRawChartFromS3(isoYear, isoWeek);
+      if (rawChart && rawChart.items.length > 0) {
+        return {
+          kind: "found",
+          chart: toChartFromRawWeekly(rawChart, period),
+          cachePolicy: getCachePolicy("found"),
+        } satisfies ChartFoundResult;
+      }
+
       return buildNotReady({
         status: "not_ready",
         type: "weekly",
