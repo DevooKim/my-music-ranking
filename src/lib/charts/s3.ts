@@ -1,5 +1,8 @@
 const bucketName =
-  process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || "my-music-ranking";
+  process.env.S3_BUCKET_NAME ||
+  process.env.AWS_BUCKET_NAME ||
+  process.env.S3_BUCKET ||
+  "my-music-ranking";
 const region =
   process.env.S3_REGION || "ap-northeast-2";
 
