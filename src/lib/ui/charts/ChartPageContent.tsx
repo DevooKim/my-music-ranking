@@ -47,7 +47,9 @@ export const ChartPageContent = ({
     <>
       <header className="sticky top-0 z-10 border-b border-white/10 bg-[#0b1020]/80 backdrop-blur">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4">
-          <p className="text-sm font-medium uppercase tracking-[0.28em] text-[#b7ffe0]">Your music flow</p>
+          <p className="text-sm font-medium uppercase tracking-[0.28em] text-[#b7ffe0]">
+            Your music flow
+          </p>
           <nav className="flex gap-2 text-sm">
             <Link
               href="/"
@@ -73,15 +75,31 @@ export const ChartPageContent = ({
 
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10">
         <header className="space-y-2">
-          <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#7af0a6]">Personal Spotify Chart</p>
-          <h1 className="text-4xl font-bold leading-tight text-white">{title}</h1>
+          <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#7af0a6]">
+            Personal Spotify Chart
+          </p>
+          <h1 className="text-4xl font-bold leading-tight text-white">
+            {title}
+          </h1>
           <p className="text-sm text-[#b6c2d1]">{description}</p>
+          {result.kind === "found" ? (
+            <p className="text-xs text-[#9ca3af]">
+              총 {result.chart.items.length.toLocaleString("ko-KR")}곡
+            </p>
+          ) : null}
         </header>
 
         <div className="flex flex-wrap gap-2">
-          {previousHref ? <DetailActionButton href={previousHref} label="이전 구간" /> : null}
-          {nextHref ? <DetailActionButton href={nextHref} label="다음 구간" /> : null}
-          <Link href={latestHref} className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-[#121212] hover:bg-white">
+          {previousHref ? (
+            <DetailActionButton href={previousHref} label="이전 구간" />
+          ) : null}
+          {nextHref ? (
+            <DetailActionButton href={nextHref} label="다음 구간" />
+          ) : null}
+          <Link
+            href={latestHref}
+            className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-[#121212] hover:bg-white"
+          >
             {quickLabel}
           </Link>
         </div>
@@ -90,10 +108,16 @@ export const ChartPageContent = ({
           <ChartList items={result.chart.items} />
         ) : result.kind === "not_found" ? (
           <section className="rounded-2xl border border-[#ffdb99]/60 bg-[#1f1f1f] p-6 text-[#ffd59a]">
-            <p className="text-lg font-semibold">현재 구간은 아직 집계되지 않았습니다.</p>
+            <p className="text-lg font-semibold">
+              현재 구간은 아직 집계되지 않았습니다.
+            </p>
             <p className="mt-2 text-sm">{result.response.message}</p>
-            <p className="mt-1 text-sm text-[#ffd59a]/90">{result.response.detail}</p>
-            <p className="mt-4 text-xs text-[#9ca3af]">캐시 정책: {result.cachePolicy.scope}</p>
+            <p className="mt-1 text-sm text-[#ffd59a]/90">
+              {result.response.detail}
+            </p>
+            <p className="mt-4 text-xs text-[#9ca3af]">
+              캐시 정책: {result.cachePolicy.scope}
+            </p>
           </section>
         ) : (
           <section className="rounded-2xl border border-[#ff8e8e]/60 bg-[#2b1616] p-6 text-[#ffc7c7]">
