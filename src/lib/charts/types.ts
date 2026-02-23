@@ -1,6 +1,10 @@
 export type ChartType = "weekly" | "monthly" | "yearly";
 
-export type CachePolicyScope = "found" | "not_found" | "latest" | "latest_not_found";
+export type CachePolicyScope =
+  | "found"
+  | "not_found"
+  | "latest"
+  | "latest_not_found";
 
 export interface CachePolicyInfo {
   scope: CachePolicyScope;
@@ -74,4 +78,7 @@ export interface ChartErrorResult {
   cachePolicy: CachePolicyInfo;
 }
 
-export type ChartQueryResult = ChartFoundResult | ChartNotFoundResult | ChartErrorResult;
+export type ChartQueryResult =
+  | ChartFoundResult
+  | ChartNotFoundResult
+  | ChartErrorResult;

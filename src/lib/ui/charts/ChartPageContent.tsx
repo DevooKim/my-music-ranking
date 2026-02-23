@@ -18,6 +18,7 @@ type ChartPageContentProps = {
   nextHref?: string;
   periods: CurrentPeriods;
   activeScope: ChartScope;
+  serverRenderedAt?: string;
 };
 
 export const ChartPageContent = ({
@@ -28,7 +29,25 @@ export const ChartPageContent = ({
   nextHref,
   periods,
   activeScope,
+  serverRenderedAt,
 }: ChartPageContentProps) => {
+  const formatDuration = (milliseconds: number) => {
+    const totalMinutes = Math.max(0, Math.floor(milliseconds / 60000));
+    return `${totalMinutes.toLocaleString("ko-KR")}분`;
+  };
+
+  const getSummary = () => {
+    if (result.kind !== "found") return null;
+    const totalDurationMs = result.chart.items.reduce(
+      (sum, item) => sum + item.totalDurationMs,
+      0,
+    );
+    return {
+      totalCount: result.chart.items.length.toLocaleString("ko-KR"),
+      totalDuration: formatDuration(totalDurationMs),
+    };
+  };
+
   const latestHref =
     activeScope === "weekly"
       ? "/"
@@ -86,12 +105,15 @@ export const ChartPageContent = ({
           </h1>
           {result.kind === "found" ? (
             <p className="text-sm text-[#b6c2d1]">
-              {description} · 총{" "}
-              {result.chart.items.length.toLocaleString("ko-KR")}곡
+              {description} · 총 {getSummary()?.totalCount}곡 · 총 재생시간{" "}
+              {getSummary()?.totalDuration}
             </p>
           ) : (
             <p className="text-sm text-[#b6c2d1]">{description}</p>
           )}
+          {serverRenderedAt ? (
+            <p className="text-xs text-[#7c8694]">서버 렌더링 시각: {serverRenderedAt}</p>
+          ) : null}
         </header>
 
         <div className="flex flex-wrap gap-2">

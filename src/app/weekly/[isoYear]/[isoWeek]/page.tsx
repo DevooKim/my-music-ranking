@@ -1,4 +1,4 @@
-import { getWeekPeriod, moveWeekPeriod } from "@/lib/charts/period";
+import { getWeekPeriod, isWeekPeriodAfter, moveWeekPeriod } from "@/lib/charts/period";
 import { getCurrentPeriods, getWeeklyChart } from "@/lib/charts/service";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
 import { notFound } from "next/navigation";
@@ -24,9 +24,18 @@ export default async function WeeklyDetailPage({
   }
 
   const period = getWeekPeriod(year, week);
+  const current = getCurrentPeriods();
+
   const previous = moveWeekPeriod(period, -1);
   const next = moveWeekPeriod(period, 1);
-  const current = getCurrentPeriods();
+  const isNextAfterCurrent = isWeekPeriodAfter(next, current.weekly);
+  const isNextCurrent =
+    next.isoYear === current.weekly.isoYear && next.isoWeek === current.weekly.isoWeek;
+  const nextHref = isNextAfterCurrent
+    ? undefined
+    : isNextCurrent
+      ? "/"
+      : `/weekly/${next.isoYear}/${String(next.isoWeek).padStart(2, "0")}`;
 
   const result = await getWeeklyChart(year, week);
 
@@ -38,7 +47,7 @@ export default async function WeeklyDetailPage({
       periods={current}
       activeScope="weekly"
       previousHref={`/weekly/${previous.isoYear}/${String(previous.isoWeek).padStart(2, "0")}`}
-      nextHref={`/weekly/${next.isoYear}/${String(next.isoWeek).padStart(2, "0")}`}
+      nextHref={nextHref}
     />
   );
 }
