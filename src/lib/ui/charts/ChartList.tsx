@@ -108,11 +108,8 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
                 <p className="truncate text-sm font-bold text-[#eef2fb] sm:text-base">
                   {item.trackName}
                 </p>
-                <p className="truncate text-xs font-semibold text-[#a4bbd9]">
-                  {item.artistNames.join(", ")}
-                </p>
                 <p className="mt-0.5 truncate text-xs text-[#9ca3af]">
-                  {item.albumName}
+                  {item.artistNames.join(", ")}
                 </p>
               </div>
               <div className="w-auto text-left text-xs text-[#9ca3af] sm:hidden">
