@@ -143,3 +143,26 @@
 - 월요일 00:30 전환 직후에 `GET /api/charts/weekly/latest`는 새 주차의 처리본 존재 유무를 반영.
 - 처리본 미생성일 때는 `Cache-Control: public, max-age=600, stale-while-revalidate=120` 기본값이 적용.
 - 처리본 존재 시에는 `Cache-Control: public, max-age=3600, stale-while-revalidate=3600` 기본값이 적용.
+
+## 9) 원샷 processed 재생성 스크립트(일회용)
+
+- 파일: `lambda/tools/rebuild-processed.ts`
+- 목적: `raw`만 존재할 때 누락된 `processed` 산출물을 한 번에 다시 생성.
+- 기본 시작점:
+  - `2025-W38` (사용자 확인 반영).
+- 범위 규칙:
+  - `--from` 미지정 시 `2025-W38`로 고정.
+  - `--to` 미지정 시 S3 `raw/` 하위에서 탐지한 마지막 주차까지 자동 확장.
+- 재생성 범위:
+  - `--scope` 기본값 `all`
+    - `weekly`: 주간만 재생성
+    - `monthly`: 월간만 재생성
+    - `all`: 주간 + 월간
+- 트랙 통계 처리:
+  - 기본 `--reset-track-stats`(기본값 true): 기존 `metadata/track-stats.json`을 백업 후 `{}`로 재시작.
+  - `--no-reset-track-stats`: 기존 track-stats를 계속 사용해 증분 재계산.
+- 실행 예시:
+  - `bun run lambda/tools/rebuild-processed.ts --scope all --from 2025-W38 --dry-run`
+  - `bun run lambda/tools/rebuild-processed.ts --scope weekly --from 2025-W38 --to 2026-W52`
+- 추가:
+  - `--list-raw-weeks`로 현재 S3 raw 주차 목록 확인 후 실행 범위를 검증.
