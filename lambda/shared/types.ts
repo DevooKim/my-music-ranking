@@ -45,11 +45,14 @@ export interface WeeklyPlayedData {
   items: PlayedItem[];
 }
 
+export type ChartEntryStatus = "new" | "reentry";
+
 export interface ChartItem {
   rank: number;
   lastRank: number | null;
   peakRank: number;
   weeksOnChart: number;
+  entryStatus: ChartEntryStatus | null;
   trackId: string;
   trackName: string;
   albumId: string;

@@ -82,6 +82,11 @@ export async function buildChart(input: BuildChartInput): Promise<BuildChartResu
       ...item,
       peakRank: Math.min(peakRank, item.rank),
       weeksOnChart: periodsOnChart,
+      entryStatus: item.lastRank === null
+        ? (updatedStats[item.trackId]?.totalWeeksOnChart ?? 0) > 1
+          ? "reentry"
+          : "new"
+        : null,
     };
   });
   

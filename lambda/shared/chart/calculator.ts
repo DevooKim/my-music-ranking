@@ -62,6 +62,7 @@ export function assignRanks(aggregated: AggregatedTrack[], limit?: number): Omit
   const limitedData = limit ? aggregated.slice(0, limit) : aggregated;
   return limitedData.map((item, index) => ({
     rank: index + 1,
+    entryStatus: null,
     trackId: item.trackId,
     trackName: item.trackName,
     albumId: item.albumId,

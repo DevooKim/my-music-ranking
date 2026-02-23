@@ -59,6 +59,7 @@ export interface ChartItem {
   lastRank: number | null;
   peakRank: number | null;
   weeksOnChart: number | null;
+  entryStatus: "new" | "reentry" | null;
 }
 
 // 차트 응답

@@ -113,6 +113,7 @@ export function assignRanks(
 ): Omit<ChartItem, "lastRank" | "peakRank" | "weeksOnChart">[] {
   return tracks.slice(0, limit).map((track, index) => ({
     rank: index + 1,
+    entryStatus: null,
     ...track,
   }));
 }
