@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Manrope, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { ScrollToTopButton } from "@/lib/ui/common/ScrollToTopButton";
@@ -16,7 +16,12 @@ export const metadata: Metadata = {
   title: "Spotify 재생 랭킹",
   description: "주간/월간/연간 랭킹을 S3 처리본 기반으로 보여주는 앱",
   manifest: "/manifest.webmanifest",
+};
+
+export const viewport: Viewport = {
   themeColor: "#02060e",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
