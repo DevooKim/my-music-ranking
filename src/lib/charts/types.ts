@@ -18,8 +18,6 @@ export interface ChartPeriod {
   month?: number;
 }
 
-export type ChartEntryStatus = "new" | "reentry";
-
 export interface ChartItem {
   rank: number;
   trackId: string;
@@ -34,7 +32,6 @@ export interface ChartItem {
   lastRank: number | null;
   peakRank: number | null;
   weeksOnChart: number | null;
-  entryStatus?: ChartEntryStatus;
 }
 
 export interface ChartResponse {

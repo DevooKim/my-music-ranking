@@ -15,7 +15,6 @@ import type {
   ChartNotFoundResult,
   ChartQueryResult,
   NotReadyChartResponse,
-  ChartEntryStatus,
 } from "@/lib/charts/types";
 import { getCachePolicy } from "@/lib/charts/cache-policy";
 import {
@@ -112,88 +111,25 @@ const toChartFromRawWeekly = (raw: RawPlayedDataLike, period: WeekPeriod): Chart
   };
 };
 
-const getPositiveIntEnv = (key: string, fallback: number): number => {
-  const raw = process.env[key];
-  if (raw == null) return fallback;
-
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isInteger(parsed) || parsed <= 0) return fallback;
-
-  return parsed;
-};
-
-const getWeeklyTrackIdsFromAnySource = async (
-  period: WeekPeriod,
-): Promise<Set<string> | null> => {
-  const processed = await getWeeklyChartFromS3(period.isoYear, period.isoWeek);
-  if (processed) {
-    return new Set(processed.items.map((item) => item.trackId));
-  }
-
-  const raw = await getWeeklyRawChartFromS3(period.isoYear, period.isoWeek);
-  if (!raw || raw.items.length === 0) return null;
-
-  return new Set(
-    raw.items
-      .map((item) => item.trackId)
-      .filter((trackId): trackId is string => typeof trackId === "string" && trackId.length > 0),
-  );
-};
-
-const resolveReentryTracks = async (
-  currentPeriod: WeekPeriod,
-  candidateTrackIds: string[],
-): Promise<Set<string>> => {
-  const uniqueCandidates = new Set(candidateTrackIds.filter((trackId) => trackId.length > 0));
-  const reentryTracks = new Set<string>();
-  if (uniqueCandidates.size === 0) return reentryTracks;
-
-  const lookbackWeeks = Math.min(
-    Math.max(getPositiveIntEnv("CHART_REENTRY_LOOKBACK_WEEKS", 52), 1),
-    520,
-  );
-  let period = moveWeekPeriod(currentPeriod, -1);
-
-  for (let i = 0; i < lookbackWeeks && uniqueCandidates.size > 0; i += 1) {
-    const trackIds = await getWeeklyTrackIdsFromAnySource(period);
-    if (trackIds) {
-      for (const trackId of trackIds) {
-        if (uniqueCandidates.delete(trackId)) {
-          reentryTracks.add(trackId);
-        }
-      }
-    }
-    period = moveWeekPeriod(period, -1);
-  }
-
-  return reentryTracks;
-};
-
 const applyRawWeeklyHistory = (
   chart: ChartResponse,
   previousWeekChart: ChartResponse | null,
-  reentryTracks: Set<string>,
 ): ChartResponse => {
   const previousByTrack = previousWeekChart
     ? new Map(previousWeekChart.items.map((item) => [item.trackId, { rank: item.rank, peakRank: item.peakRank, weeksOnChart: item.weeksOnChart }]))
     : new Map<string, { rank: number; peakRank: number | null; weeksOnChart: number | null }>();
 
-  const isReentry = (trackId: string): ChartEntryStatus => {
-    return reentryTracks.has(trackId) ? "reentry" : "new";
-  };
-
   if (!previousWeekChart) {
-    return {
-      ...chart,
-      items: chart.items.map((item) => ({
-        ...item,
-        lastRank: null,
-        peakRank: item.rank,
-        weeksOnChart: 1,
-        entryStatus: isReentry(item.trackId),
-      })),
-    };
-  }
+      return {
+        ...chart,
+        items: chart.items.map((item) => ({
+          ...item,
+          lastRank: null,
+          peakRank: item.rank,
+          weeksOnChart: 1,
+        })),
+      };
+    }
 
   return {
     ...chart,
@@ -205,7 +141,6 @@ const applyRawWeeklyHistory = (
           lastRank: null,
           peakRank: item.rank,
           weeksOnChart: 1,
-          entryStatus: isReentry(item.trackId),
         };
       }
 
@@ -271,18 +206,10 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
     if (!chart) {
       const rawChart = await getWeeklyRawChartFromS3(period.isoYear, period.isoWeek);
       if (rawChart && rawChart.items.length > 0) {
-        const currentRawChart = toChartFromRawWeekly(rawChart, period);
         const previousWeekChart = await getPreviousWeekChartForRaw(period);
-        const previousTrackIds = new Set(previousWeekChart?.items.map((item) => item.trackId) ?? []);
-        const reentryCandidateTrackIds = currentRawChart.items
-          .filter((item) => !previousTrackIds.has(item.trackId))
-          .map((item) => item.trackId);
-
-        const reentryTracks = await resolveReentryTracks(period, reentryCandidateTrackIds);
         const latestRawChart = applyRawWeeklyHistory(
-          currentRawChart,
+          toChartFromRawWeekly(rawChart, period),
           previousWeekChart,
-          reentryTracks,
         );
         return {
           kind: "found",

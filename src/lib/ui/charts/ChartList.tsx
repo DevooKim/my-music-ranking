@@ -30,16 +30,15 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
           {virtualItems.map((virtualRow) => {
             const item = items[virtualRow.index];
             const rankDelta = item.lastRank === null ? null : item.lastRank - item.rank;
-            const isReentry = item.lastRank === null && item.entryStatus === "reentry";
+            const deltaText = rankDelta === null || rankDelta === 0 ? "-" : `${rankDelta > 0 ? "▲" : "▼"} ${Math.abs(rankDelta)}`;
             const peakText = item.peakRank === null ? "-" : `${item.peakRank}`;
             const coverUrl =
               item.albumImageUrl && item.albumImageUrl.length > 0
                 ? item.albumImageUrl
                 : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='12' fill='%232a3343'/%3E%3Cpath d='M33 28h30c2.8 0 5 2.2 5 5v25.4c-2.4-1.4-5.2-2.2-8.2-2.2-7.7 0-14 6.3-14 14s6.3 14 14 14c7.7 0 14-6.3 14-14V33c0-1.5-1.5-2.8-3.3-2.8H33c-1.8 0-3.3 1.3-3.3 2.8v30c0 1.5 1.5 2.8 3.3 2.8h1.5V28z' fill='%237af0a6'/%3E%3C/svg%3E";
-            const deltaText = rankDelta === null || rankDelta === 0 ? "0" : `${rankDelta > 0 ? "▲" : "▼"} ${Math.abs(rankDelta)}`;
             const deltaClass =
               rankDelta === null || rankDelta === 0
-                ? "text-[#7b8494]"
+                ? "text-[#9ca3af]"
                 : rankDelta > 0
                   ? "text-[#1ed760]"
                   : "text-[#f97373]";
@@ -73,18 +72,7 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
                 </div>
                 <div className="w-40 text-right text-[11px] text-[#d1dce9]">
                   <div className="mb-1 flex items-center justify-end gap-2">
-                    {item.lastRank === null ? (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isReentry ? "bg-[#4f46e5]" : "bg-[#1ed760]"} text-[#04100a]`}
-                      >
-                        {isReentry ? "REENTRY" : "NEW"}
-                      </span>
-                    ) : (
-                      <>
-                        <span className="font-medium">LW {item.lastRank}</span>
-                        <span className={`font-medium ${deltaClass}`}>{deltaText}</span>
-                      </>
-                    )}
+                    <span className={`font-medium ${deltaClass}`}>{deltaText}</span>
                     <span className="font-medium">PEAK {peakText}</span>
                   </div>
                   <div className="text-[10px] text-[#7b8494]">WEEKS {item.weeksOnChart ?? "-"}</div>
