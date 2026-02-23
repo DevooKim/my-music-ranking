@@ -70,7 +70,7 @@ export const ChartPageContent = ({
             href="/"
             className="text-sm font-medium uppercase tracking-[0.28em] text-[#b7ffe0]"
           >
-            Your music flow
+            My music Ranking
           </Link>
           <nav className="flex gap-2 text-sm">
             <Link
@@ -97,9 +97,6 @@ export const ChartPageContent = ({
 
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10">
         <header className="space-y-2">
-          <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#7af0a6]">
-            Personal Spotify Chart
-          </p>
           <h1 className="text-4xl font-bold leading-tight text-white">
             {title}
           </h1>
