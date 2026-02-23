@@ -57,9 +57,11 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
             const rankDelta =
               item.lastRank === null ? null : item.lastRank - item.rank;
             const rankDeltaText =
-              rankDelta === null || rankDelta === 0
-                ? "-"
-                : `${rankDelta > 0 ? "▲" : "▼"} ${Math.abs(rankDelta)}`;
+              statusText === null && rankDelta !== null
+                ? rankDelta === 0
+                  ? "-"
+                  : `${rankDelta > 0 ? "▲" : "▼"} ${Math.abs(rankDelta)}`
+                : null;
             const peakText = item.peakRank === null ? "-" : `${item.peakRank}`;
             const coverUrl =
               item.albumImageUrl && item.albumImageUrl.length > 0
@@ -117,9 +119,11 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
                         {statusText}
                       </span>
                     ) : null}
-                    <span className={`font-medium ${deltaClass}`}>
-                      지난 주 대비 {rankDeltaText}
-                    </span>
+                    {rankDeltaText ? (
+                      <span className={`font-medium ${deltaClass}`}>
+                        지난 주 대비 {rankDeltaText}
+                      </span>
+                    ) : null}
                   </div>
                   <div className="flex items-center justify-end gap-2">
                     <span className="font-medium">PEAK {peakText}</span>
