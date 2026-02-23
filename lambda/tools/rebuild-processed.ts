@@ -188,7 +188,7 @@ async function rebuildWeeklyRange(
     const previous = getPreviousWeek(current);
     const previousKey = formatWeek(previous);
     const lastChart = previousCache.get(previousKey)
-      ?? (await getS3Json<ChartResponse>(s3Paths.weeklyProcessed(previous.isoYear, previous.isoWeek));
+      ?? (await getS3Json<ChartResponse>(s3Paths.weeklyProcessed(previous.isoYear, previous.isoWeek)));
 
     const { chart, updatedStats } = buildChart({
       items: raw.items as PlayedItem[],
@@ -273,7 +273,7 @@ async function rebuildMonthlyRange(
     const previousMonth = subMonths(current, 1);
     const previousLabel = `${previousMonth.getFullYear()}-${String(previousMonth.getMonth() + 1).padStart(2, "0")}`;
     const lastChart = previousCache.get(previousLabel)
-      ?? (await getS3Json<ChartResponse>(s3Paths.monthlyProcessed(previousMonth.getFullYear(), previousMonth.getMonth() + 1));
+      ?? (await getS3Json<ChartResponse>(s3Paths.monthlyProcessed(previousMonth.getFullYear(), previousMonth.getMonth() + 1)));
 
     const { chart, updatedStats } = buildChart({
       items: allItems,
