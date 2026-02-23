@@ -26,6 +26,7 @@ export const s3Paths = {
 
 export async function getS3Json<T>(key: string): Promise<T | null> {
   try {
+    console.log(`[S3] GET s3://${BUCKET}/${key}`);
     const result = await s3.send(new GetObjectCommand({
       Bucket: BUCKET,
       Key: key,
@@ -49,6 +50,7 @@ export async function putS3Json(key: string, data: unknown): Promise<void> {
 }
 
 export async function listS3Keys(prefix: string): Promise<string[]> {
+  console.log(`[S3] LIST s3://${BUCKET}/${prefix}`);
   const result = await s3.send(new ListObjectsV2Command({
     Bucket: BUCKET,
     Prefix: prefix,

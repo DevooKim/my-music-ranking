@@ -147,6 +147,30 @@ export const getMonthPeriod = (year: number, month: number): MonthPeriod => {
   };
 };
 
+export const isWeekPeriodAfter = (
+  lhs: { isoYear: number; isoWeek: number },
+  rhs: { isoYear: number; isoWeek: number },
+): boolean => {
+  if (lhs.isoYear !== rhs.isoYear) return lhs.isoYear > rhs.isoYear;
+  return lhs.isoWeek > rhs.isoWeek;
+};
+
+export const isWeekPeriodEqual = (
+  lhs: { isoYear: number; isoWeek: number },
+  rhs: { isoYear: number; isoWeek: number },
+): boolean => lhs.isoYear === rhs.isoYear && lhs.isoWeek === rhs.isoWeek;
+
+export const isMonthPeriodAfter = (
+  lhs: { year: number; month: number },
+  rhs: { year: number; month: number },
+): boolean => {
+  if (lhs.year !== rhs.year) return lhs.year > rhs.year;
+  return lhs.month > rhs.month;
+};
+
+export const isYearPeriodAfter = (lhs: number, rhs: number): boolean =>
+  lhs > rhs;
+
 export const moveMonthPeriod = (period: MonthPeriod, offset: number): MonthPeriod => {
   const moved = addMonths(new Date(period.year, period.month - 1, 1), offset);
   return getMonthPeriod(moved.getFullYear(), moved.getMonth() + 1);

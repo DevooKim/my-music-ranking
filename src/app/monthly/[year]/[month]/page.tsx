@@ -1,4 +1,7 @@
-import { getMonthPeriod, moveMonthPeriod } from "@/lib/charts/period";
+import {
+  getMonthPeriod,
+  moveMonthPeriod,
+} from "@/lib/charts/period";
 import { getCurrentPeriods, getMonthlyChart } from "@/lib/charts/service";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
 import { notFound } from "next/navigation";
@@ -24,9 +27,15 @@ export default async function MonthlyDetailPage({
   }
 
   const period = getMonthPeriod(parsedYear, parsedMonth);
+  const current = getCurrentPeriods();
+
   const previous = moveMonthPeriod(period, -1);
   const next = moveMonthPeriod(period, 1);
-  const current = getCurrentPeriods();
+  const isNextAfterCurrent =
+    next.year > current.monthly.year || (next.year === current.monthly.year && next.month > current.monthly.month);
+  const nextHref = isNextAfterCurrent
+    ? undefined
+    : `/monthly/${next.year}/${String(next.month).padStart(2, "0")}`;
 
   const result = await getMonthlyChart(parsedYear, parsedMonth);
 
@@ -38,7 +47,7 @@ export default async function MonthlyDetailPage({
       periods={current}
       activeScope="monthly"
       previousHref={`/monthly/${previous.year}/${String(previous.month).padStart(2, "0")}`}
-      nextHref={`/monthly/${next.year}/${String(next.month).padStart(2, "0")}`}
+      nextHref={nextHref}
     />
   );
 }

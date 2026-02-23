@@ -1,7 +1,9 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
-const bucketName = process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || "my-music-ranking";
-const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "ap-northeast-2";
+const bucketName =
+  process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || "my-music-ranking";
+const region =
+  process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "ap-northeast-2";
 
 const s3 = new S3Client({ region });
 

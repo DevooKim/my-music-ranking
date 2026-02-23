@@ -22,9 +22,14 @@ export default async function YearlyDetailPage({
   }
 
   const period = getYearPeriod(parsedYear);
+  const current = getCurrentPeriods();
+
   const previous = moveYearPeriod(period, -1);
   const next = moveYearPeriod(period, 1);
-  const current = getCurrentPeriods();
+  const isNextAfterCurrent = next.year > current.yearly.year;
+  const nextHref = isNextAfterCurrent
+    ? undefined
+    : `/yearly/${next.year}`;
 
   const result = await getYearlyChart(parsedYear);
 
@@ -36,7 +41,7 @@ export default async function YearlyDetailPage({
       periods={current}
       activeScope="yearly"
       previousHref={`/yearly/${previous.year}`}
-      nextHref={`/yearly/${next.year}`}
+      nextHref={nextHref}
     />
   );
 }
