@@ -3,14 +3,29 @@ const SHELL_CACHE = "my-music-ranking-shell-v1";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
-  "/icon-192.svg",
-  "/icon-512.svg",
+  "/pwa-192.svg",
+  "/pwa-512.svg",
   "/favicon.ico",
 ];
 
+const cacheAsset = async (cache, asset) => {
+  try {
+    const response = await fetch(asset);
+    if (!response.ok) {
+      throw new Error(`${asset} ${response.status}`);
+    }
+    await cache.put(asset, response);
+  } catch {
+    return;
+  }
+};
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_ASSETS)),
+    (async () => {
+      const cache = await caches.open(SHELL_CACHE);
+      await Promise.all(SHELL_ASSETS.map((asset) => cacheAsset(cache, asset)));
+    })(),
   );
   self.skipWaiting();
 });
@@ -47,7 +62,19 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(async () => caches.match("/")),
+        .catch(async () => {
+          const fallback = await caches.match("/");
+          return (
+            fallback ||
+            new Response("오프라인 상태입니다. 연결 상태를 확인해 주세요.", {
+              status: 503,
+              statusText: "Service Unavailable",
+              headers: {
+                "Content-Type": "text/plain; charset=UTF-8",
+              },
+            })
+          );
+        }),
     );
     return;
   }
