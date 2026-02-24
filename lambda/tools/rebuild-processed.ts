@@ -171,6 +171,40 @@ function toKstDate(value: string): Date {
   return new TZDate(value, KOREA_TIMEZONE);
 }
 
+const REENTRY_LOOKBACK_WEEKS = 4;
+
+async function getRecentTrackIdsFromPreviousWeeks(
+  current: WeekPoint,
+  previousCache: Map<string, ChartResponse | null>,
+): Promise<Set<string>> {
+  const recentTrackIds = new Set<string>();
+  let cursor = getPreviousWeek(current);
+
+  for (let step = 0; step < REENTRY_LOOKBACK_WEEKS; step += 1) {
+    const previousKey = formatWeek(cursor);
+    const cached = previousCache.get(previousKey);
+    const previous = cached === undefined
+      ? await getS3Json<ChartResponse>(
+          s3Paths.weeklyProcessed(cursor.isoYear, cursor.isoWeek),
+        )
+      : cached;
+
+    if (cached === undefined) {
+      previousCache.set(previousKey, previous);
+    }
+
+    if (previous?.items?.length) {
+      for (const item of previous.items) {
+        recentTrackIds.add(item.trackId);
+      }
+    }
+
+    cursor = getPreviousWeek(cursor);
+  }
+
+  return recentTrackIds;
+}
+
 async function rebuildWeeklyRange(
   start: WeekPoint,
   end: WeekPoint,
@@ -200,8 +234,15 @@ async function rebuildWeeklyRange(
 
     const previous = getPreviousWeek(current);
     const previousKey = formatWeek(previous);
-    const lastChart = previousCache.get(previousKey)
-      ?? (await getS3Json<ChartResponse>(s3Paths.weeklyProcessed(previous.isoYear, previous.isoWeek)));
+    const lastChart = previousCache.has(previousKey)
+      ? previousCache.get(previousKey) ?? null
+      : await getS3Json<ChartResponse>(
+          s3Paths.weeklyProcessed(previous.isoYear, previous.isoWeek),
+        );
+    const recentlySeenTrackIds = await getRecentTrackIdsFromPreviousWeeks(
+      current,
+      previousCache,
+    );
 
     const { chart, updatedStats } = buildChart({
       items: raw.items as PlayedItem[],
@@ -214,6 +255,7 @@ async function rebuildWeeklyRange(
         isoWeek: current.isoWeek,
       },
       lastChart,
+      recentlySeenTrackIds,
       trackStats: currentStats,
     });
 
