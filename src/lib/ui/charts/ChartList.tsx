@@ -10,6 +10,11 @@ const ITEM_HEIGHT = 98;
 const ITEM_HEIGHT_MOBILE = 78;
 const ITEM_GAP_MOBILE = 10;
 
+type Props = {
+  items: ChartItem[];
+  chartType?: ChartType;
+};
+
 const toEntryStatusText = (status: ChartItem["entryStatus"]) => {
   if (status === "new") return "NEW";
   if (status === "reentry") return "RE-ENTRY";
@@ -26,7 +31,7 @@ const toStatusClassName = (status: ChartItem["entryStatus"]) => {
   return "";
 };
 
-export const ChartList = ({ items }: { items: ChartItem[] }) => {
+export const ChartList = ({ items, chartType }: Props) => {
   const isMobile =
     typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
 
@@ -199,7 +204,7 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
                     ) : null}
                     {rankDeltaText ? (
                       <span className={`font-medium ${deltaClass}`}>
-                        지난 주 대비 {rankDeltaText}
+                        {chartType === "monthly" ? "지난 달 대비" : "지난 주 대비"} {rankDeltaText}
                       </span>
                     ) : null}
                   </div>
@@ -233,3 +238,4 @@ export const DetailActionButton = ({
     {label}
   </a>
 );
+import type { ChartItem, ChartType } from "@/lib/charts/types";
