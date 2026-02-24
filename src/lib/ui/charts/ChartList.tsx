@@ -80,6 +80,7 @@ export const ChartList = ({ items, chartType }: Props) => {
                 : `${rankDelta > 0 ? "▲" : "▼"} ${Math.abs(rankDelta)}`
               : null;
           const peakText = item.peakRank === null ? "-" : `${item.peakRank}`;
+          const shouldShowPeakWeeks = item.peakRank !== null || item.weeksOnChart !== null;
           const coverUrl =
             item.albumImageUrl && item.albumImageUrl.length > 0
               ? item.albumImageUrl
@@ -189,12 +190,14 @@ export const ChartList = ({ items, chartType }: Props) => {
                       </span>
                     ) : null}
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#7b8494]">
-                    <span className="font-medium text-[#d1dce9]">
-                      PEAK {peakText}
-                    </span>
-                    <span>WEEKS {item.weeksOnChart ?? "-"}</span>
-                  </div>
+                  {shouldShowPeakWeeks ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#7b8494]">
+                      <span className="font-medium text-[#d1dce9]">
+                        PEAK {peakText}
+                      </span>
+                      <span>WEEKS {item.weeksOnChart ?? "-"}</span>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="hidden text-right text-xs text-[#9ca3af] sm:block">
                   <p className="font-semibold text-white">
@@ -216,12 +219,14 @@ export const ChartList = ({ items, chartType }: Props) => {
                       </span>
                     ) : null}
                   </div>
-                  <div className="flex items-center justify-end gap-2">
-                    <span className="font-medium">PEAK {peakText}</span>
-                    <span className="text-[10px] text-[#7b8494]">
-                      WEEKS {item.weeksOnChart ?? "-"}
-                    </span>
-                  </div>
+                  {shouldShowPeakWeeks ? (
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="font-medium">PEAK {peakText}</span>
+                      <span className="text-[10px] text-[#7b8494]">
+                        WEEKS {item.weeksOnChart ?? "-"}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </li>
