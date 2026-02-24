@@ -34,6 +34,17 @@ interface BuildChartResult {
   updatedStats: TrackStats;
 }
 
+const getPreviousChartStreaks = (
+  lastChart: ChartResponse | null,
+  chartType: ChartType,
+): Map<string, number> => {
+  if (!lastChart || lastChart.type !== chartType) return new Map();
+
+  return new Map(
+    lastChart.items.map((item) => [item.trackId, item.weeksOnChart ?? 0]),
+  );
+};
+
 /**
  * S3 패턴 결정
  */
@@ -53,6 +64,7 @@ function getS3Pattern(chartType: ChartType, period: BuildChartInput["period"]): 
  */
 export async function buildChart(input: BuildChartInput): Promise<BuildChartResult> {
   const { chartType, period, lastChart, trackStats, limit = 100 } = input;
+  const previousChartStreaks = getPreviousChartStreaks(lastChart, chartType);
   
   // 1. S3 패턴 결정 및 DuckDB로 집계
   const s3Pattern = getS3Pattern(chartType, period);
@@ -73,15 +85,20 @@ export async function buildChart(input: BuildChartInput): Promise<BuildChartResu
   
   // 5. peak/weeks 정보 추가
   const finalItems: ChartItem[] = withLastRank.map((item) => {
-    const { peakRank, periodsOnChart } = getStatsForChart(
+    const { peakRank } = getStatsForChart(
       updatedStats,
       item.trackId
     );
+
+    const periodStreak =
+      item.lastRank === null
+        ? 1
+        : (previousChartStreaks.get(item.trackId) ?? 0) + 1;
     
     return {
       ...item,
       peakRank: Math.min(peakRank, item.rank),
-      weeksOnChart: periodsOnChart,
+      weeksOnChart: periodStreak,
       entryStatus: item.lastRank === null
         ? (updatedStats[item.trackId]?.totalWeeksOnChart ?? 0) > 1
           ? "reentry"

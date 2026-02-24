@@ -358,9 +358,16 @@ export const getWeeklyChart = async (
         lookupScope,
       );
       if (rawChart && rawChart.items.length > 0) {
+        const previousWeekChart = await getPreviousWeekChartForRaw(
+          period,
+          lookupScope,
+        );
         return {
           kind: "found",
-          chart: toChartFromRawWeekly(rawChart, period),
+          chart: applyRawWeeklyHistory(
+            toChartFromRawWeekly(rawChart, period),
+            previousWeekChart,
+          ),
           cachePolicy: getCachePolicy(lookupScope),
         } satisfies ChartFoundResult;
       }

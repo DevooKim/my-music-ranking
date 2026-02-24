@@ -40,8 +40,20 @@ const getPreviousPeriodCount = (
   return stats.totalYearsOnChart;
 };
 
+const getPreviousChartStreaks = (
+  lastChart: ChartResponse | null,
+  chartType: ChartType,
+): Map<string, number> => {
+  if (!lastChart || lastChart.type !== chartType) return new Map();
+
+  return new Map(
+    lastChart.items.map((item) => [item.trackId, item.weeksOnChart ?? 0]),
+  );
+};
+
 export function buildChart(input: BuildChartInput): BuildChartResult {
   const { items, chartType, period, lastChart, trackStats, limit } = input;
+  const previousChartStreaks = getPreviousChartStreaks(lastChart, chartType);
   
   // 1. 집계
   const aggregated = aggregatePlays(items);
@@ -62,7 +74,7 @@ export function buildChart(input: BuildChartInput): BuildChartResult {
   
   // 5. peak/weeks 정보 추가
   const finalItems: ChartItem[] = withLastRank.map((item) => {
-    const { peakRank, periodsOnChart } = getStatsForChart(
+    const { peakRank } = getStatsForChart(
       updatedStats,
       item.trackId,
       chartType
@@ -72,10 +84,15 @@ export function buildChart(input: BuildChartInput): BuildChartResult {
       ? previousPeriods > 0 ? "reentry" : "new"
       : null;
     
+    const periodStreak =
+      item.lastRank === null
+        ? 1
+        : (previousChartStreaks.get(item.trackId) ?? 0) + 1;
+
     return {
       ...item,
       peakRank: Math.min(peakRank, item.rank),
-      weeksOnChart: periodsOnChart,
+      weeksOnChart: periodStreak,
       entryStatus,
     };
   });
