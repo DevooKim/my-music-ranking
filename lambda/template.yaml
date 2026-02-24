@@ -31,7 +31,7 @@ Parameters:
 
 Resources:
 
-  # 2시간마다 Spotify 재생 기록 수집
+  # 30분마다 Spotify 재생 기록 수집
   CollectorFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -62,7 +62,7 @@ Resources:
         ScheduleEvent:
           Type: Schedule
           Properties:
-            Schedule: cron(0 0/2 * * ? *)
+            Schedule: cron(0/30 * * * ? *)
 
   # 매주 월요일: raw 병합 + 주간 차트 생성
   WeeklyProcessorFunction:
