@@ -146,8 +146,8 @@ const toChartFromRawWeekly = (
         ...item,
         rank: index + 1,
         lastRank: null,
-        peakRank: index + 1,
-        weeksOnChart: 1,
+        peakRank: null,
+        weeksOnChart: null,
         entryStatus: null,
       };
     });
@@ -413,19 +413,9 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
       });
     }
 
-    const { recentTrackIds, everAppearedTrackIds } =
-      await getRecentAndEverSeenWeeklyTrackIds(period, "latest");
-    const previousWeekChart = await getPreviousWeekChartForRaw(period, "latest");
-    const latestRawChart = applyRawWeeklyHistory(
-      toChartFromRawWeekly(rawChart, period),
-      previousWeekChart,
-      recentTrackIds,
-      everAppearedTrackIds,
-    );
-
     return {
       kind: "found",
-      chart: latestRawChart,
+      chart: toChartFromRawWeekly(rawChart, period),
       cachePolicy: getCachePolicy("latest"),
     } satisfies ChartFoundResult;
   } catch {

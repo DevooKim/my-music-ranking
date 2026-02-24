@@ -43,7 +43,9 @@ export const getJsonFromS3 = async <T>(key: string): Promise<T | null> => {
       },
     });
 
-    if (response.status === 404) return null;
+    if (response.status === 404) {
+      return null;
+    }
     if (!response.ok) {
       throw new Error(`S3 fetch failed: ${response.status} ${response.statusText}`);
     }
