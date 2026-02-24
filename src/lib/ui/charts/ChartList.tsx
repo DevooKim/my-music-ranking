@@ -95,28 +95,65 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
                 height: `${visualHeight}px`,
               }}
             >
-              <a
-                href={spotifyAlbumUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex h-full w-full items-center gap-2 rounded-xl border border-white/10 bg-[#0e121b] px-2.5 py-2 transition-colors hover:bg-[#141c2a] sm:gap-4 sm:px-4 sm:py-3"
-              >
+              <div className="flex h-full w-full items-center gap-2 rounded-xl border border-white/10 bg-[#0e121b] px-2.5 py-2 transition-colors hover:bg-[#141c2a] sm:gap-4 sm:px-4 sm:py-3">
                 <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1ed760] text-sm font-bold text-[#04100a]">
                   {item.rank}
                 </span>
-                {/* biome-ignore lint/performance/noImgElement: album cover thumbnail from processed data URL */}
-                <img
-                  src={coverUrl}
-                  alt={item.albumName || item.trackName}
-                  className="h-10 w-10 shrink-0 rounded-lg object-cover sm:h-12 sm:w-12"
-                  loading="lazy"
-                />
+                <a
+                  href={spotifyAlbumUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${item.albumName} 앨범 링크`}
+                  className="hover:underline"
+                >
+                  {/* biome-ignore lint/performance/noImgElement: album cover thumbnail from processed data URL */}
+                  <img
+                    src={coverUrl}
+                    alt={item.albumName || item.trackName}
+                    className="h-10 w-10 shrink-0 rounded-lg object-cover sm:h-12 sm:w-12"
+                    loading="lazy"
+                  />
+                </a>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-[#eef2fb] sm:text-base">
-                    {item.trackName}
-                  </p>
+                  <a
+                    href={spotifyAlbumUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block select-text cursor-pointer hover:underline"
+                  >
+                    <p className="truncate text-sm font-bold text-[#eef2fb] sm:text-base">
+                      {item.trackName}
+                    </p>
+                  </a>
                   <p className="mt-0.5 truncate text-xs text-[#9ca3af]">
-                    {item.artistNames.join(", ")}
+                    {item.artistNames.length === 0
+                      ? "-"
+                      : item.artistNames.map((artistName, index) => {
+                          const artistId = item.artistIds[index];
+                          const spotifyArtistUrl = artistId
+                            ? `https://open.spotify.com/artist/${artistId}`
+                            : null;
+                          const isLast = index === item.artistNames.length - 1;
+                          return (
+                            <span key={`${item.trackId}-${artistName}-${index}`}>
+                              {spotifyArtistUrl ? (
+                                <a
+                                  href={spotifyArtistUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="select-text cursor-pointer hover:underline"
+                                >
+                                  {artistName}
+                                </a>
+                              ) : (
+                                <span className="select-text cursor-text">
+                                  {artistName}
+                                </span>
+                              )}
+                              {!isLast && ", "}
+                            </span>
+                          );
+                        })}
                   </p>
                 </div>
                 <div className="w-auto text-left text-xs text-[#9ca3af] sm:hidden">
@@ -173,7 +210,7 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
                     </span>
                   </div>
                 </div>
-              </a>
+              </div>
             </li>
           );
         })}
