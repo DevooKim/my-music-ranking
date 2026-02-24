@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ChartQueryResult } from "@/lib/charts/types";
+import { moveMonthPeriod, moveYearPeriod } from "@/lib/charts/period";
 import { ChartList, DetailActionButton } from "@/lib/ui/charts/ChartList";
 
 type ChartScope = "weekly" | "monthly" | "yearly";
@@ -48,19 +49,22 @@ export const ChartPageContent = ({
     };
   };
 
+  const lastMonth = moveMonthPeriod(periods.monthly, -1);
+  const lastYear = moveYearPeriod(periods.yearly, -1);
+
   const latestHref =
     activeScope === "weekly"
       ? "/"
       : activeScope === "monthly"
-        ? `/monthly/${periods.monthly.year}/${String(periods.monthly.month).padStart(2, "0")}`
-        : `/yearly/${periods.yearly.year}`;
+        ? `/monthly/${lastMonth.year}/${String(lastMonth.month).padStart(2, "0")}`
+        : `/yearly/${lastYear.year}`;
 
   const quickLabel =
     activeScope === "weekly"
       ? "이번 주차로 이동"
       : activeScope === "monthly"
-        ? "이번 달로 이동"
-        : "이번 연도로 이동";
+        ? "지난 달로 이동"
+        : "작년으로 이동";
 
   return (
     <>
@@ -87,13 +91,13 @@ export const ChartPageContent = ({
               주간
             </Link>
             <Link
-              href={`/monthly/${periods.monthly.year}/${String(periods.monthly.month).padStart(2, "0")}`}
+              href={`/monthly/${activeScope === "monthly" ? String(periods.monthly.year) : String(lastMonth.year)}/${activeScope === "monthly" ? String(periods.monthly.month).padStart(2, "0") : String(lastMonth.month).padStart(2, "0")}`}
               className={`rounded-full px-2.5 py-1.5 text-center ${activeScope === "monthly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"} sm:px-4`}
             >
               월간
             </Link>
             <Link
-              href={`/yearly/${periods.yearly.year}`}
+              href={activeScope === "yearly" ? `/yearly/${periods.yearly.year}` : `/yearly/${lastYear.year}`}
               className={`rounded-full px-2.5 py-1.5 text-center ${activeScope === "yearly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"} sm:px-4`}
             >
               연간
