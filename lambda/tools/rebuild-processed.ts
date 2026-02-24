@@ -1,4 +1,4 @@
-import { addMonths, addWeeks, eachWeekOfInterval, endOfISOWeek, endOfMonth, getISOWeek, getISOWeekYear, startOfISOWeek, startOfMonth, subMonths } from "date-fns";
+import { addMonths, addWeeks, addYears, eachWeekOfInterval, endOfISOWeek, endOfMonth, endOfYear, getISOWeek, getISOWeekYear, startOfISOWeek, startOfMonth, startOfYear, subMonths } from "date-fns";
 import { TZDate } from "@date-fns/tz";
 import { buildChart } from "../shared/chart";
 import { listS3Keys, getS3Json, putS3Json, s3Paths } from "../shared/s3";
@@ -14,7 +14,7 @@ interface WeekPoint {
   isoWeek: number;
 }
 
-type Scope = "weekly" | "monthly" | "all";
+type Scope = "weekly" | "monthly" | "yearly" | "all";
 
 interface RebuildOptions {
   start: WeekPoint;
@@ -34,7 +34,7 @@ Usage:
 Options:
   --from <YYYY-Www>       시작 주차 지정 (기본: ${formatWeek(DEFAULT_START_WEEK)})
   --to <YYYY-Www>         종료 주차 지정 (기본: S3 raw에서 감지한 마지막 주차)
-  --scope <weekly|monthly|all>  처리 범위 (기본: all)
+  --scope <weekly|monthly|yearly|all>  처리 범위 (기본: all)
   --track-stats-format <json|parquet|both>  track-stats 저장 포맷 (기본: both)
   --dry-run               실제 S3 쓰기 없이 동작만 확인
   --no-reset-track-stats  기존 track-stats.json을 유지하면서 재계산
@@ -93,8 +93,8 @@ function parseArgs(argv: string[]): RebuildOptions {
       }
       case "--scope": {
         const value = argv[index + 1];
-        if (!value || (value !== "weekly" && value !== "monthly" && value !== "all")) {
-          throw new Error("--scope must be weekly | monthly | all");
+        if (!value || (value !== "weekly" && value !== "monthly" && value !== "yearly" && value !== "all")) {
+          throw new Error("--scope must be weekly | monthly | yearly | all");
         }
         options.scope = value as Scope;
         index += 1;
@@ -171,6 +171,18 @@ function toKstDate(value: string): Date {
   return new TZDate(value, KOREA_TIMEZONE);
 }
 
+function isCurrentWeek(target: WeekPoint, current: WeekPoint): boolean {
+  return target.isoYear === current.isoYear && target.isoWeek === current.isoWeek;
+}
+
+function isCurrentMonth(target: Date, current: Date): boolean {
+  return target.getFullYear() === current.getFullYear() && target.getMonth() === current.getMonth();
+}
+
+function isCurrentYear(targetYear: number, current: Date): boolean {
+  return targetYear === current.getFullYear();
+}
+
 const REENTRY_LOOKBACK_WEEKS = 4;
 
 async function getRecentTrackIdsFromPreviousWeeks(
@@ -209,10 +221,12 @@ async function rebuildWeeklyRange(
   start: WeekPoint,
   end: WeekPoint,
   trackStats: TrackStats,
+  currentDate: Date,
   dryRun: boolean,
 ): Promise<TrackStats> {
   let cursor = getWeekRange(start.isoYear, start.isoWeek).start;
   const endDate = getWeekRange(end.isoYear, end.isoWeek).start;
+  const currentWeek = getWeekKeyFromDate(currentDate);
 
   const previousCache = new Map<string, ChartResponse | null>();
   let currentStats = { ...trackStats };
@@ -221,6 +235,12 @@ async function rebuildWeeklyRange(
   while (cursor.getTime() <= endDate.getTime()) {
     const current = getWeekKeyFromDate(cursor);
     const keyLabel = formatWeek(current);
+    if (isCurrentWeek(current, currentWeek)) {
+      console.log(`[SKIP] weekly ${keyLabel}: current week excluded`);
+      cursor = addWeeks(cursor, 1);
+      continue;
+    }
+
     const rawKey = s3Paths.raw(current.isoYear, current.isoWeek);
     const raw = await getS3Json<RawPlayedData>(rawKey);
 
@@ -284,6 +304,7 @@ async function rebuildMonthlyRange(
   start: WeekPoint,
   end: WeekPoint,
   trackStats: TrackStats,
+  currentDate: Date,
   dryRun: boolean,
 ): Promise<TrackStats> {
   const startDate = startOfMonth(getWeekRange(start.isoYear, start.isoWeek).start);
@@ -298,6 +319,12 @@ async function rebuildMonthlyRange(
     const year = current.getFullYear();
     const month = current.getMonth() + 1;
     const monthLabel = `${year}-${String(month).padStart(2, "0")}`;
+    if (isCurrentMonth(current, currentDate)) {
+      console.log(`[SKIP] monthly ${monthLabel}: current month excluded`);
+      current = addMonths(current, 1);
+      continue;
+    }
+
     const startAt = startOfMonth(current);
     const endAt = endOfMonth(current);
     const weeks = eachWeekOfInterval({ start: startAt, end: endAt }, { weekStartsOn: 1 });
@@ -360,6 +387,99 @@ async function rebuildMonthlyRange(
   return currentStats;
 }
 
+async function rebuildYearlyRange(
+  start: WeekPoint,
+  end: WeekPoint,
+  trackStats: TrackStats,
+  currentDate: Date,
+  dryRun: boolean,
+): Promise<TrackStats> {
+  let current = startOfYear(getWeekRange(start.isoYear, start.isoWeek).start);
+  const endDate = startOfYear(getWeekRange(end.isoYear, end.isoWeek).start);
+
+  const previousCache = new Map<number, ChartResponse | null>();
+  let currentStats = { ...trackStats };
+  let processed = 0;
+
+  while (current.getTime() <= endDate.getTime()) {
+    const year = current.getFullYear();
+    const yearLabel = `${year}`;
+
+    if (isCurrentYear(year, currentDate)) {
+      console.log(`[SKIP] yearly ${yearLabel}: current year excluded`);
+      current = addYears(current, 1);
+      continue;
+    }
+
+    const startAt = startOfYear(current);
+    const endAt = endOfYear(current);
+    const weeks = eachWeekOfInterval({ start: startAt, end: endAt }, { weekStartsOn: 1 });
+    const allItems: PlayedItem[] = [];
+
+    for (const weekStart of weeks) {
+      const weekPoint = getWeekKeyFromDate(weekStart);
+      const raw = await getS3Json<RawPlayedData>(s3Paths.raw(weekPoint.isoYear, weekPoint.isoWeek));
+      if (!raw?.items?.length) {
+        continue;
+      }
+
+      for (const item of raw.items) {
+        const playedAt = toKstDate(item.playedAt);
+        if (playedAt >= startAt && playedAt <= endAt) {
+          allItems.push(item);
+        }
+      }
+    }
+
+    if (allItems.length === 0) {
+      console.log(`[SKIP] yearly ${yearLabel}: no raw records`);
+      current = addYears(current, 1);
+      continue;
+    }
+
+    const previousYear = year - 1;
+    const cached = previousCache.get(previousYear);
+    const lastChart = cached === undefined
+      ? await getS3Json<ChartResponse>(s3Paths.yearlyProcessed(previousYear))
+      : cached;
+    if (cached === undefined) {
+      previousCache.set(previousYear, lastChart);
+    }
+
+    const { chart, updatedStats } = buildChart({
+      items: allItems,
+      chartType: "yearly",
+      period: {
+        start: startAt.toISOString(),
+        end: endAt.toISOString(),
+        label: yearLabel,
+        year,
+      },
+      lastChart,
+      trackStats: currentStats,
+    });
+
+    const chartWithoutEntryStatus: typeof chart = {
+      ...chart,
+      items: chart.items.map((item) => ({ ...item, entryStatus: null })),
+    };
+
+    if (!dryRun) {
+      await putS3Json(s3Paths.yearlyProcessed(year), chartWithoutEntryStatus);
+    }
+
+    previousCache.set(year, chart);
+    currentStats = updatedStats;
+    processed += 1;
+
+    console.log(`[OK] yearly ${yearLabel}: ${chart.items.length} items`);
+    current = addYears(current, 1);
+  }
+
+  console.log(`[DONE] yearly range processed: ${processed}`);
+  return currentStats;
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
 
@@ -404,6 +524,8 @@ async function main(): Promise<void> {
     console.log(`[INFO] track-stats backup: ${backupKey}`);
   }
 
+  const currentDate = toKstDate(new Date().toISOString());
+
   console.log("[INFO] rebuild options:");
   console.log(`- scope: ${options.scope}`);
   console.log(`- start: ${formatWeek(start)}`);
@@ -413,11 +535,15 @@ async function main(): Promise<void> {
   console.log(`- trackStatsFormat: ${options.trackStatsFormat}`);
 
   if (options.scope === "weekly" || options.scope === "all") {
-    trackStats = await rebuildWeeklyRange(start, end, trackStats, options.dryRun);
+    trackStats = await rebuildWeeklyRange(start, end, trackStats, currentDate, options.dryRun);
   }
 
   if (options.scope === "monthly" || options.scope === "all") {
-    trackStats = await rebuildMonthlyRange(start, end, trackStats, options.dryRun);
+    trackStats = await rebuildMonthlyRange(start, end, trackStats, currentDate, options.dryRun);
+  }
+
+  if (options.scope === "yearly" || options.scope === "all") {
+    trackStats = await rebuildYearlyRange(start, end, trackStats, currentDate, options.dryRun);
   }
 
   if (!options.dryRun) {
