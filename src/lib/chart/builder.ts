@@ -36,16 +36,13 @@ interface BuildChartResult {
 }
 
 const getPreviousPeriodCount = (
-  chartType: ChartType,
   trackStats: TrackStats,
   trackId: string,
 ): number => {
   const stats = trackStats[trackId];
   if (!stats) return 0;
 
-  if (chartType === "weekly") return stats.totalWeeksOnChart;
-  if (chartType === "monthly") return stats.totalMonthsOnChart;
-  return stats.totalYearsOnChart;
+  return stats.totalWeeksOnChart;
 };
 
 const getPreviousChartStreaks = (
@@ -104,7 +101,6 @@ export async function buildChart(input: BuildChartInput): Promise<BuildChartResu
       item.trackId
     );
     const previousPeriods = getPreviousPeriodCount(
-      chartType,
       trackStats,
       item.trackId,
     );

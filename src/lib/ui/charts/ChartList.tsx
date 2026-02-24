@@ -1,9 +1,11 @@
 "use client";
 
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { ChartItem } from "@/lib/charts/types";
+import type { ChartItem as ChartListItem } from "@/lib/charts/types";
 
 /* eslint-disable @next/next/no-img-element */
+
+type ChartType = "weekly" | "monthly" | "yearly";
 
 const MOBILE_BREAKPOINT = 640;
 const ITEM_HEIGHT = 98;
@@ -11,17 +13,17 @@ const ITEM_HEIGHT_MOBILE = 78;
 const ITEM_GAP_MOBILE = 10;
 
 type Props = {
-  items: ChartItem[];
+  items: ChartListItem[];
   chartType?: ChartType;
 };
 
-const toEntryStatusText = (status: ChartItem["entryStatus"]) => {
+const toEntryStatusText = (status: ChartListItem["entryStatus"]) => {
   if (status === "new") return "NEW";
   if (status === "reentry") return "RE-ENTRY";
   return null;
 };
 
-const toStatusClassName = (status: ChartItem["entryStatus"]) => {
+const toStatusClassName = (status: ChartListItem["entryStatus"]) => {
   if (status === "new") {
     return "bg-[#1ed760]/90 text-[#04100a]";
   }
@@ -238,4 +240,3 @@ export const DetailActionButton = ({
     {label}
   </a>
 );
-import type { ChartItem, ChartType } from "@/lib/charts/types";
