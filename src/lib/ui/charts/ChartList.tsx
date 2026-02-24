@@ -83,87 +83,97 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
             ? Math.max(56, rowSize - ITEM_GAP_MOBILE)
             : rowSize;
           const topOffset = isMobile ? ITEM_GAP_MOBILE / 2 : 0;
+          const spotifyAlbumUrl = `https://open.spotify.com/album/${item.albumId}`;
 
           return (
             <li
               key={item.trackId}
-              className="absolute left-0 flex w-full items-center gap-2 rounded-xl border border-white/10 bg-[#0e121b] px-2.5 py-2 sm:gap-4 sm:px-4 sm:py-3"
+              className="absolute left-0 w-full"
               style={{
                 top: `${virtualRow.start + topOffset}px`,
                 transform: "translateY(0px)",
                 height: `${visualHeight}px`,
               }}
             >
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1ed760] text-sm font-bold text-[#04100a]">
-                {item.rank}
-              </span>
-              {/* biome-ignore lint/performance/noImgElement: album cover thumbnail from processed data URL */}
-              <img
-                src={coverUrl}
-                alt={item.albumName || item.trackName}
-                className="h-10 w-10 shrink-0 rounded-lg object-cover sm:h-12 sm:w-12"
-                loading="lazy"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-[#eef2fb] sm:text-base">
-                  {item.trackName}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-[#9ca3af]">
-                  {item.artistNames.join(", ")}
-                </p>
-              </div>
-              <div className="w-auto text-left text-xs text-[#9ca3af] sm:hidden">
-                <p className="truncate text-[11px] font-semibold text-white">
-                  재생 {item.playCount.toLocaleString("ko-KR")}회
-                </p>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                  {statusText ? (
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${toStatusClassName(item.entryStatus)}`}
-                    >
-                      {statusText}
-                    </span>
-                  ) : null}
-                  {rankDeltaText ? (
-                    <span
-                      className={`truncate text-[10px] font-medium ${deltaClass}`}
-                    >
-                      {rankDeltaText}
-                    </span>
-                  ) : null}
+              <a
+                href={spotifyAlbumUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-full w-full items-center gap-2 rounded-xl border border-white/10 bg-[#0e121b] px-2.5 py-2 transition-colors hover:bg-[#141c2a] sm:gap-4 sm:px-4 sm:py-3"
+              >
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1ed760] text-sm font-bold text-[#04100a]">
+                  {item.rank}
+                </span>
+                {/* biome-ignore lint/performance/noImgElement: album cover thumbnail from processed data URL */}
+                <img
+                  src={coverUrl}
+                  alt={item.albumName || item.trackName}
+                  className="h-10 w-10 shrink-0 rounded-lg object-cover sm:h-12 sm:w-12"
+                  loading="lazy"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-[#eef2fb] sm:text-base">
+                    {item.trackName}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-[#9ca3af]">
+                    {item.artistNames.join(", ")}
+                  </p>
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#7b8494]">
-                  <span className="font-medium text-[#d1dce9]">PEAK {peakText}</span>
-                  <span>WEEKS {item.weeksOnChart ?? "-"}</span>
-                </div>
-              </div>
-              <div className="hidden text-right text-xs text-[#9ca3af] sm:block">
-                <p className="font-semibold text-white">
-                  재생 {item.playCount.toLocaleString("ko-KR")}회
-                </p>
-              </div>
-              <div className="hidden w-44 text-right text-[11px] text-[#d1dce9] sm:block">
-                <div className="mb-2 flex items-center justify-end gap-2">
-                  {statusText ? (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${toStatusClassName(item.entryStatus)}`}
-                    >
-                      {statusText}
+                <div className="w-auto text-left text-xs text-[#9ca3af] sm:hidden">
+                  <p className="truncate text-[11px] font-semibold text-white">
+                    재생 {item.playCount.toLocaleString("ko-KR")}회
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {statusText ? (
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${toStatusClassName(item.entryStatus)}`}
+                      >
+                        {statusText}
+                      </span>
+                    ) : null}
+                    {rankDeltaText ? (
+                      <span
+                        className={`truncate text-[10px] font-medium ${deltaClass}`}
+                      >
+                        {rankDeltaText}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[#7b8494]">
+                    <span className="font-medium text-[#d1dce9]">
+                      PEAK {peakText}
                     </span>
-                  ) : null}
-                  {rankDeltaText ? (
-                    <span className={`font-medium ${deltaClass}`}>
-                      지난 주 대비 {rankDeltaText}
+                    <span>WEEKS {item.weeksOnChart ?? "-"}</span>
+                  </div>
+                </div>
+                <div className="hidden text-right text-xs text-[#9ca3af] sm:block">
+                  <p className="font-semibold text-white">
+                    재생 {item.playCount.toLocaleString("ko-KR")}회
+                  </p>
+                </div>
+                <div className="hidden w-44 text-right text-[11px] text-[#d1dce9] sm:block">
+                  <div className="mb-2 flex items-center justify-end gap-2">
+                    {statusText ? (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${toStatusClassName(item.entryStatus)}`}
+                      >
+                        {statusText}
+                      </span>
+                    ) : null}
+                    {rankDeltaText ? (
+                      <span className={`font-medium ${deltaClass}`}>
+                        지난 주 대비 {rankDeltaText}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="font-medium">PEAK {peakText}</span>
+                    <span className="text-[10px] text-[#7b8494]">
+                      WEEKS {item.weeksOnChart ?? "-"}
                     </span>
-                  ) : null}
+                  </div>
                 </div>
-                <div className="flex items-center justify-end gap-2">
-                  <span className="font-medium">PEAK {peakText}</span>
-                  <span className="text-[10px] text-[#7b8494]">
-                    WEEKS {item.weeksOnChart ?? "-"}
-                  </span>
-                </div>
-              </div>
+              </a>
             </li>
           );
         })}
