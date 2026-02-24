@@ -409,7 +409,7 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
         type: "weekly",
         period,
         message: "이번 주 raw 데이터가 아직 집계되지 않았습니다.",
-        detail: "2시간 주기 raw 수집이 반영되면 즉시 조회됩니다.",
+        detail: "raw 수집 주기가 반영되면 즉시 조회됩니다.",
       });
     }
 
