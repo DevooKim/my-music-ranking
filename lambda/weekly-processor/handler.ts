@@ -8,6 +8,33 @@ import { buildTrackStatsNotificationPayload, sendDiscordNotification } from "../
 
 const KOREA_TIMEZONE = "Asia/Seoul";
 type LambdaContextLike = { memoryLimitInMB?: number | string };
+const REENTRY_LOOKBACK_WEEKS = 4;
+
+async function getRecentTrackIdsFromPreviousWeeks(
+  fromDate: Date,
+  lookbackWeeks = REENTRY_LOOKBACK_WEEKS,
+): Promise<Set<string>> {
+  const trackIds = new Set<string>();
+  let cursor = fromDate;
+
+  for (let step = 0; step < lookbackWeeks; step += 1) {
+    const previous = subWeeks(cursor, 1);
+    const previousIsoYear = getISOWeekYear(previous);
+    const previousIsoWeek = getISOWeek(previous);
+    cursor = previous;
+
+    const previousChart = await getS3Json<ChartResponse>(
+      s3Paths.weeklyProcessed(previousIsoYear, previousIsoWeek),
+    );
+    if (!previousChart?.items?.length) continue;
+
+    for (const item of previousChart.items) {
+      trackIds.add(item.trackId);
+    }
+  }
+
+  return trackIds;
+}
 
 function getLambdaRuntime(startMs: number, context?: LambdaContextLike) {
   const memory = process.memoryUsage();
@@ -97,6 +124,7 @@ export const handler = async (_event: unknown, context?: LambdaContextLike): Pro
     );
     
     // 3. track-stats 사용/갱신
+    const recentTrackIds = await getRecentTrackIdsFromPreviousWeeks(lastWeek);
     const buildStart = Date.now();
     const { chart, updatedStats } = buildChart({
       items: weeklyItems,
@@ -109,6 +137,7 @@ export const handler = async (_event: unknown, context?: LambdaContextLike): Pro
         isoWeek,
       },
       lastChart,
+      recentlySeenTrackIds: recentTrackIds,
       trackStats: trackStatsRead.data,
     });
     const buildDuration = Date.now() - buildStart;

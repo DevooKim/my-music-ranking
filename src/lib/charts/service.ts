@@ -17,6 +17,7 @@ import {
   getYearlyChartFromS3,
   type RawPlayedDataLike,
 } from "@/lib/charts/repository";
+import { chartS3Keys, getJsonFromS3 } from "@/lib/charts/s3";
 import type {
   CachePolicyScope,
   ChartErrorResult,
@@ -145,8 +146,8 @@ const toChartFromRawWeekly = (
         ...item,
         rank: index + 1,
         lastRank: null,
-        peakRank: null,
-        weeksOnChart: null,
+        peakRank: index + 1,
+        weeksOnChart: 1,
         entryStatus: null,
       };
     });
@@ -188,9 +189,39 @@ const isFutureYearPeriod = (year: number): boolean => {
 const resolveLookupScope = (isFuture: boolean): CachePolicyScope =>
   isFuture ? "not_found" : "found";
 
+const REENTRY_LOOKBACK_WEEKS = 4;
+
+const getEverAppearedWeeklyTrackIds = async (): Promise<Set<string>> => {
+  try {
+    const trackStats = await getJsonFromS3<Record<string, unknown> | null>(
+      chartS3Keys.trackStats(),
+    );
+    if (!trackStats || typeof trackStats !== "object") return new Set();
+
+    const seen = new Set<string>();
+
+    for (const [trackId, value] of Object.entries(trackStats)) {
+      if (!value || typeof value !== "object") continue;
+      const totalWeeksOnChart = Number(
+        (value as { totalWeeksOnChart?: unknown }).totalWeeksOnChart,
+      );
+
+      if (Number.isFinite(totalWeeksOnChart) && totalWeeksOnChart > 0) {
+        seen.add(trackId);
+      }
+    }
+
+    return seen;
+  } catch {
+    return new Set();
+  }
+};
+
 const applyRawWeeklyHistory = (
   chart: ChartResponse,
   previousWeekChart: ChartResponse | null,
+  recentTrackIds?: Set<string>,
+  everAppearedTrackIds?: Set<string>,
 ): ChartResponse => {
   const previousByTrack = previousWeekChart
     ? new Map(
@@ -211,12 +242,24 @@ const applyRawWeeklyHistory = (
   if (!previousWeekChart) {
     return {
       ...chart,
-      items: chart.items.map((item) => ({
-        ...item,
-        lastRank: null,
-        peakRank: item.rank,
-        weeksOnChart: 1,
-      })),
+      items: chart.items.map((item) => {
+        const hasEverAppeared =
+          everAppearedTrackIds?.has(item.trackId) ?? false;
+        const wasRecentlySeen = recentTrackIds?.has(item.trackId) ?? false;
+
+        return {
+          ...item,
+          lastRank: null,
+          peakRank: item.rank,
+          weeksOnChart: 1,
+          entryStatus:
+            hasEverAppeared && !wasRecentlySeen
+              ? "reentry"
+              : hasEverAppeared
+                ? null
+                : "new",
+        };
+      }),
     };
   }
 
@@ -225,11 +268,21 @@ const applyRawWeeklyHistory = (
     items: chart.items.map((item) => {
       const previous = previousByTrack.get(item.trackId);
       if (!previous) {
+        const hasEverAppeared =
+          everAppearedTrackIds?.has(item.trackId) ?? false;
+        const wasRecentlySeen = recentTrackIds?.has(item.trackId) ?? false;
+
         return {
           ...item,
           lastRank: null,
           peakRank: item.rank,
           weeksOnChart: 1,
+          entryStatus:
+            hasEverAppeared && !wasRecentlySeen
+              ? "reentry"
+              : hasEverAppeared
+                ? null
+                : "new",
         };
       }
 
@@ -241,8 +294,48 @@ const applyRawWeeklyHistory = (
         lastRank: previous.rank,
         peakRank: Math.min(previousPeak, item.rank),
         weeksOnChart: previousWeeks + 1,
+        entryStatus: null,
       };
     }),
+  };
+};
+
+const collectRecentWeeklyTrackIds = async (
+  period: WeekPeriod,
+  lookupScope: CachePolicyScope,
+  lookbackWeeks = REENTRY_LOOKBACK_WEEKS,
+): Promise<Set<string>> => {
+  const trackIds = new Set<string>();
+  let cursor = period;
+
+  for (let step = 0; step < lookbackWeeks; step += 1) {
+    const previous = await getPreviousWeekChartForRaw(cursor, lookupScope);
+    if (previous?.items?.length) {
+      for (const item of previous.items) {
+        trackIds.add(item.trackId);
+      }
+    }
+    cursor = moveWeekPeriod(cursor, -1);
+  }
+
+  return trackIds;
+};
+
+const getRecentAndEverSeenWeeklyTrackIds = async (
+  period: WeekPeriod,
+  lookupScope: CachePolicyScope,
+): Promise<{
+  recentTrackIds: Set<string>;
+  everAppearedTrackIds: Set<string>;
+}> => {
+  const [recentTrackIds, everAppearedTrackIds] = await Promise.all([
+    collectRecentWeeklyTrackIds(period, lookupScope),
+    getEverAppearedWeeklyTrackIds(),
+  ]);
+
+  return {
+    recentTrackIds,
+    everAppearedTrackIds,
   };
 };
 
@@ -311,6 +404,8 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
       "latest",
     );
     if (rawChart && rawChart.items.length > 0) {
+      const { recentTrackIds, everAppearedTrackIds } =
+        await getRecentAndEverSeenWeeklyTrackIds(period, "latest");
       const previousWeekChart = await getPreviousWeekChartForRaw(
         period,
         "latest",
@@ -318,6 +413,8 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
       const latestRawChart = applyRawWeeklyHistory(
         toChartFromRawWeekly(rawChart, period),
         previousWeekChart,
+        recentTrackIds,
+        everAppearedTrackIds,
       );
       return {
         kind: "found",
@@ -378,6 +475,8 @@ export const getWeeklyChart = async (
         lookupScope,
       );
       if (rawChart && rawChart.items.length > 0) {
+        const { recentTrackIds, everAppearedTrackIds } =
+          await getRecentAndEverSeenWeeklyTrackIds(period, lookupScope);
         const previousWeekChart = await getPreviousWeekChartForRaw(
           period,
           lookupScope,
@@ -387,6 +486,8 @@ export const getWeeklyChart = async (
           chart: applyRawWeeklyHistory(
             toChartFromRawWeekly(rawChart, period),
             previousWeekChart,
+            recentTrackIds,
+            everAppearedTrackIds,
           ),
           cachePolicy: getCachePolicy(lookupScope),
         } satisfies ChartFoundResult;

@@ -22,6 +22,7 @@ export const chartS3Keys = {
   monthly: (year: number, month: number) =>
     `processed/monthly/${year}/monthly-month-${pad2(month)}.json`,
   yearly: (year: number) => `processed/yearly/yearly-${year}.json`,
+  trackStats: () => "metadata/track-stats.json",
 };
 
 const isNotFoundError = (error: unknown): boolean => {

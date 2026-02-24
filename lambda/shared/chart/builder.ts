@@ -19,6 +19,7 @@ interface BuildChartInput {
   };
   lastChart: ChartResponse | null;
   trackStats: TrackStats;
+  recentlySeenTrackIds?: Set<string>;
   limit?: number;
 }
 
@@ -80,8 +81,25 @@ export function buildChart(input: BuildChartInput): BuildChartResult {
       chartType
     );
     const previousPeriods = getPreviousPeriodCount(trackStats, item.trackId, chartType);
+    const hasRecentWindowData = Boolean(input.recentlySeenTrackIds);
+    const hasSeenBefore =
+      previousPeriods > 0;
+    const wasSeenInWindow =
+      hasRecentWindowData && input.recentlySeenTrackIds?.has(item.trackId) ? true : false;
+    const shouldMarkReentry =
+      hasRecentWindowData && hasSeenBefore && !wasSeenInWindow;
     const entryStatus = item.lastRank === null
-      ? previousPeriods > 0 ? "reentry" : "new"
+      ? chartType === "weekly"
+        ? hasRecentWindowData
+          ? !hasSeenBefore
+            ? "new"
+            : shouldMarkReentry
+              ? "reentry"
+              : null
+          : (hasSeenBefore ? "reentry" : "new")
+        : previousPeriods > 0
+          ? "reentry"
+          : "new"
       : null;
     
     const periodStreak =

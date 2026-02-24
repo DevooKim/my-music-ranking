@@ -1,22 +1,29 @@
 "use client";
 
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { ChartItem } from "@/lib/charts/types";
+import type { ChartItem as ChartListItem } from "@/lib/charts/types";
 
 /* eslint-disable @next/next/no-img-element */
+
+type ChartType = "weekly" | "monthly" | "yearly";
 
 const MOBILE_BREAKPOINT = 640;
 const ITEM_HEIGHT = 98;
 const ITEM_HEIGHT_MOBILE = 78;
 const ITEM_GAP_MOBILE = 10;
 
-const toEntryStatusText = (status: ChartItem["entryStatus"]) => {
+type Props = {
+  items: ChartListItem[];
+  chartType?: ChartType;
+};
+
+const toEntryStatusText = (status: ChartListItem["entryStatus"]) => {
   if (status === "new") return "NEW";
   if (status === "reentry") return "RE-ENTRY";
   return null;
 };
 
-const toStatusClassName = (status: ChartItem["entryStatus"]) => {
+const toStatusClassName = (status: ChartListItem["entryStatus"]) => {
   if (status === "new") {
     return "bg-[#1ed760]/90 text-[#04100a]";
   }
@@ -26,7 +33,7 @@ const toStatusClassName = (status: ChartItem["entryStatus"]) => {
   return "";
 };
 
-export const ChartList = ({ items }: { items: ChartItem[] }) => {
+export const ChartList = ({ items, chartType }: Props) => {
   const isMobile =
     typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
 
@@ -199,7 +206,7 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
                     ) : null}
                     {rankDeltaText ? (
                       <span className={`font-medium ${deltaClass}`}>
-                        지난 주 대비 {rankDeltaText}
+                        {chartType === "monthly" ? "지난 달 대비" : "지난 주 대비"} {rankDeltaText}
                       </span>
                     ) : null}
                   </div>

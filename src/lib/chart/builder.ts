@@ -13,6 +13,7 @@ type ChartType = "weekly" | "monthly" | "yearly";
 
 interface BuildChartInput {
   chartType: ChartType;
+  recentlySeenTrackIds?: Set<string>;
   period: {
     start: string;
     end: string;
@@ -33,6 +34,16 @@ interface BuildChartResult {
   chart: ChartResponse;
   updatedStats: TrackStats;
 }
+
+const getPreviousPeriodCount = (
+  trackStats: TrackStats,
+  trackId: string,
+): number => {
+  const stats = trackStats[trackId];
+  if (!stats) return 0;
+
+  return stats.totalWeeksOnChart;
+};
 
 const getPreviousChartStreaks = (
   lastChart: ChartResponse | null,
@@ -89,6 +100,18 @@ export async function buildChart(input: BuildChartInput): Promise<BuildChartResu
       updatedStats,
       item.trackId
     );
+    const previousPeriods = getPreviousPeriodCount(
+      trackStats,
+      item.trackId,
+    );
+    const hasRecentWindowData = Boolean(input.recentlySeenTrackIds);
+    const hasSeenBefore = previousPeriods > 0;
+    const wasSeenInWindow =
+      hasRecentWindowData && input.recentlySeenTrackIds?.has(item.trackId)
+        ? true
+        : false;
+    const shouldMarkReentry =
+      hasRecentWindowData && hasSeenBefore && !wasSeenInWindow;
 
     const periodStreak =
       item.lastRank === null
@@ -100,9 +123,17 @@ export async function buildChart(input: BuildChartInput): Promise<BuildChartResu
       peakRank: Math.min(peakRank, item.rank),
       weeksOnChart: periodStreak,
       entryStatus: item.lastRank === null
-        ? (updatedStats[item.trackId]?.totalWeeksOnChart ?? 0) > 1
-          ? "reentry"
-          : "new"
+        ? chartType === "weekly"
+          ? hasRecentWindowData
+            ? !hasSeenBefore
+              ? "new"
+              : shouldMarkReentry
+                ? "reentry"
+                : null
+            : (hasSeenBefore ? "reentry" : "new")
+          : previousPeriods > 0
+            ? "reentry"
+            : "new"
         : null,
     };
   });
