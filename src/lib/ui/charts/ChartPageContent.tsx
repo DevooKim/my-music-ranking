@@ -1,14 +1,15 @@
 import Link from "next/link";
 import type { ChartQueryResult } from "@/lib/charts/types";
+import type { MonthPeriod, YearPeriod, WeekPeriod } from "@/lib/charts/period";
 import { moveMonthPeriod, moveYearPeriod } from "@/lib/charts/period";
 import { ChartList, DetailActionButton } from "@/lib/ui/charts/ChartList";
 
 type ChartScope = "weekly" | "monthly" | "yearly";
 
 type CurrentPeriods = {
-  weekly: { isoYear: number; isoWeek: number };
-  monthly: { year: number; month: number };
-  yearly: { year: number };
+  weekly: WeekPeriod;
+  monthly: MonthPeriod;
+  yearly: YearPeriod;
 };
 
 type ChartPageContentProps = {
