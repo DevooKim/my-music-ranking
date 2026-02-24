@@ -403,40 +403,29 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
       period.isoWeek,
       "latest",
     );
-    if (rawChart && rawChart.items.length > 0) {
-      const { recentTrackIds, everAppearedTrackIds } =
-        await getRecentAndEverSeenWeeklyTrackIds(period, "latest");
-      const previousWeekChart = await getPreviousWeekChartForRaw(
-        period,
-        "latest",
-      );
-      const latestRawChart = applyRawWeeklyHistory(
-        toChartFromRawWeekly(rawChart, period),
-        previousWeekChart,
-        recentTrackIds,
-        everAppearedTrackIds,
-      );
-      return {
-        kind: "found",
-        chart: latestRawChart,
-        cachePolicy: getCachePolicy("latest"),
-      } satisfies ChartFoundResult;
-    }
-
-    const chart = await getWeeklyChartFromS3(period.isoYear, period.isoWeek, "latest");
-    if (!chart) {
+    if (!rawChart || rawChart.items.length === 0) {
       return buildLatestNotReady({
         status: "not_ready",
         type: "weekly",
         period,
-        message: "이번 주 처리본이 아직 생성되지 않았습니다.",
-        detail: "Lambda가 집계를 완료하면 즉시 조회됩니다.",
+        message: "이번 주 raw 데이터가 아직 집계되지 않았습니다.",
+        detail: "2시간 주기 raw 수집이 반영되면 즉시 조회됩니다.",
       });
     }
 
+    const { recentTrackIds, everAppearedTrackIds } =
+      await getRecentAndEverSeenWeeklyTrackIds(period, "latest");
+    const previousWeekChart = await getPreviousWeekChartForRaw(period, "latest");
+    const latestRawChart = applyRawWeeklyHistory(
+      toChartFromRawWeekly(rawChart, period),
+      previousWeekChart,
+      recentTrackIds,
+      everAppearedTrackIds,
+    );
+
     return {
       kind: "found",
-      chart,
+      chart: latestRawChart,
       cachePolicy: getCachePolicy("latest"),
     } satisfies ChartFoundResult;
   } catch {
