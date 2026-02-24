@@ -36,6 +36,10 @@ type RawPlayedItem = RawPlayedDataLike["items"][number] & {
   artistNames?: unknown;
   durationMs?: unknown;
   playedAt?: unknown;
+  url?: unknown;
+  trackExternalUrls?: {
+    spotify?: unknown;
+  };
 };
 
 const toChartFromRawWeekly = (
@@ -61,6 +65,7 @@ const toChartFromRawWeekly = (
       playCount: number;
       totalDurationMs: number;
       lastPlayedAt: number;
+      url: string | null;
     }
   >();
 
@@ -85,6 +90,15 @@ const toChartFromRawWeekly = (
       if (playedAt > previous.lastPlayedAt) {
         previous.lastPlayedAt = playedAt;
       }
+      if (!previous.url) {
+        const candidateUrl =
+          typeof item.url === "string"
+            ? item.url
+            : typeof item.trackExternalUrls?.spotify === "string"
+              ? item.trackExternalUrls.spotify
+              : null;
+        previous.url = candidateUrl;
+      }
       return;
     }
 
@@ -103,6 +117,12 @@ const toChartFromRawWeekly = (
       playCount: 1,
       totalDurationMs: Number.isFinite(duration) ? duration : 0,
       lastPlayedAt: playedAt,
+      url:
+        typeof item.url === "string"
+          ? item.url
+          : typeof item.trackExternalUrls?.spotify === "string"
+            ? item.trackExternalUrls.spotify
+            : null,
     });
   });
 

@@ -83,7 +83,9 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
             ? Math.max(56, rowSize - ITEM_GAP_MOBILE)
             : rowSize;
           const topOffset = isMobile ? ITEM_GAP_MOBILE / 2 : 0;
-          const spotifyTrackUrl = `https://open.spotify.com/track/${item.trackId}`;
+          const spotifyTrackUrl = item.url && item.url.length > 0
+            ? item.url
+            : `https://open.spotify.com/track/${item.trackId}`;
 
           return (
             <li

@@ -28,6 +28,7 @@ export interface ChartItem {
   rank: number;
   trackId: string;
   trackName: string;
+  url?: string | null;
   albumId: string;
   albumName: string;
   albumImageUrl: string;
