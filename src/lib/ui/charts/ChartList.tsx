@@ -83,9 +83,7 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
             ? Math.max(56, rowSize - ITEM_GAP_MOBILE)
             : rowSize;
           const topOffset = isMobile ? ITEM_GAP_MOBILE / 2 : 0;
-          const spotifyTrackUrl = item.url && item.url.length > 0
-            ? item.url
-            : `https://open.spotify.com/track/${item.trackId}`;
+          const spotifyAlbumUrl = `https://open.spotify.com/album/${item.albumId}`;
 
           return (
             <li
@@ -98,7 +96,7 @@ export const ChartList = ({ items }: { items: ChartItem[] }) => {
               }}
             >
               <a
-                href={spotifyTrackUrl}
+                href={spotifyAlbumUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex h-full w-full items-center gap-2 rounded-xl border border-white/10 bg-[#0e121b] px-2.5 py-2 transition-colors hover:bg-[#141c2a] sm:gap-4 sm:px-4 sm:py-3"
