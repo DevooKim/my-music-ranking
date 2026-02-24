@@ -2,6 +2,7 @@ import { addMonths, addWeeks, eachWeekOfInterval, endOfISOWeek, endOfMonth, getI
 import { TZDate } from "@date-fns/tz";
 import { buildChart } from "../shared/chart";
 import { listS3Keys, getS3Json, putS3Json, s3Paths } from "../shared/s3";
+import { getTrackStats, putTrackStats } from "../shared/track-stats-storage";
 import type { ChartResponse, PlayedItem, RawPlayedData, TrackStats } from "../shared/types";
 
 const KOREA_TIMEZONE = "Asia/Seoul";
@@ -22,6 +23,7 @@ interface RebuildOptions {
   dryRun: boolean;
   resetTrackStats: boolean;
   listRawOnly: boolean;
+  trackStatsFormat: "json" | "parquet" | "both";
 }
 
 function printHelp(): void {
@@ -33,6 +35,7 @@ Options:
   --from <YYYY-Www>       시작 주차 지정 (기본: ${formatWeek(DEFAULT_START_WEEK)})
   --to <YYYY-Www>         종료 주차 지정 (기본: S3 raw에서 감지한 마지막 주차)
   --scope <weekly|monthly|all>  처리 범위 (기본: all)
+  --track-stats-format <json|parquet|both>  track-stats 저장 포맷 (기본: both)
   --dry-run               실제 S3 쓰기 없이 동작만 확인
   --no-reset-track-stats  기존 track-stats.json을 유지하면서 재계산
   --list-raw-weeks        처리 가능한 raw 주차 목록만 출력 후 종료
@@ -63,6 +66,7 @@ function parseArgs(argv: string[]): RebuildOptions {
     dryRun: false,
     resetTrackStats: true,
     listRawOnly: false,
+    trackStatsFormat: "both",
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -93,6 +97,15 @@ function parseArgs(argv: string[]): RebuildOptions {
           throw new Error("--scope must be weekly | monthly | all");
         }
         options.scope = value as Scope;
+        index += 1;
+        break;
+      }
+      case "--track-stats-format": {
+        const value = argv[index + 1];
+        if (!value || (value !== "json" && value !== "parquet" && value !== "both")) {
+          throw new Error("--track-stats-format must be json | parquet | both");
+        }
+        options.trackStatsFormat = value;
         index += 1;
         break;
       }
@@ -336,7 +349,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  const lastTrackStats = (await getS3Json<TrackStats>(s3Paths.trackStats())) || {};
+  const lastTrackStatsResult = await getTrackStats({
+    storageFormats: options.trackStatsFormat,
+    readPreference: options.trackStatsFormat === "json" ? "json" : "parquet",
+  });
+  const lastTrackStats = lastTrackStatsResult.data;
   let trackStats: TrackStats = options.resetTrackStats ? {} : { ...lastTrackStats };
 
   if (options.resetTrackStats && !options.dryRun) {
@@ -351,6 +368,7 @@ async function main(): Promise<void> {
   console.log(`- end: ${formatWeek(end)}`);
   console.log(`- dryRun: ${options.dryRun ? "true" : "false"}`);
   console.log(`- resetTrackStats: ${options.resetTrackStats ? "true" : "false"}`);
+  console.log(`- trackStatsFormat: ${options.trackStatsFormat}`);
 
   if (options.scope === "weekly" || options.scope === "all") {
     trackStats = await rebuildWeeklyRange(start, end, trackStats, options.dryRun);
@@ -361,8 +379,14 @@ async function main(): Promise<void> {
   }
 
   if (!options.dryRun) {
-    await putS3Json(s3Paths.trackStats(), trackStats);
-    console.log("[INFO] updated track-stats.json");
+    const writeResult = await putTrackStats(trackStats, {
+      storageFormats: options.trackStatsFormat,
+      readPreference: options.trackStatsFormat === "json" ? "json" : "parquet",
+    });
+    console.log(`[INFO] updated track-stats (${writeResult.wroteJson ? "json" : ""}${writeResult.wroteParquet ? `${writeResult.wroteJson ? "/" : ""}parquet` : ""})`);
+    if (writeResult.partialFailure) {
+      console.log(`[WARN] partial track-stats write: ${writeResult.warnings.join("; ")}`);
+    }
   } else {
     console.log("[INFO] dry-run mode: track-stats.json write skipped");
   }

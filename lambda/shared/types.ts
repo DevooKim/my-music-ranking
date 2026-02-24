@@ -92,5 +92,7 @@ export interface TrackStats {
     totalPlayedCount: number;
     trackName: string;
     artistNames: string[];
+    albumId: string;
+    albumName: string;
   };
 }
