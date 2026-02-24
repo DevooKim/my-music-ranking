@@ -33,6 +33,12 @@ const toStatusClassName = (status: ChartListItem["entryStatus"]) => {
   return "";
 };
 
+const getDeltaLabel = (chartType: ChartType | undefined) => {
+  if (chartType === "monthly") return "지난 달 대비";
+  if (chartType === "yearly") return "지난 해 대비";
+  return "지난 주 대비";
+};
+
 export const ChartList = ({ items, chartType }: Props) => {
   const isMobile =
     typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
@@ -206,7 +212,7 @@ export const ChartList = ({ items, chartType }: Props) => {
                     ) : null}
                     {rankDeltaText ? (
                       <span className={`font-medium ${deltaClass}`}>
-                        {chartType === "monthly" ? "지난 달 대비" : "지난 주 대비"} {rankDeltaText}
+                        {getDeltaLabel(chartType)} {rankDeltaText}
                       </span>
                     ) : null}
                   </div>
