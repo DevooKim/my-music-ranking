@@ -83,6 +83,8 @@ export interface TrackStats {
     peakRank: number;
     peakPeriod: string;
     totalWeeksOnChart: number;
+    albumId: string;
+    albumName: string;
     trackName: string;
     artistNames: string[];
   };

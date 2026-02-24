@@ -25,6 +25,8 @@ export function updateTrackStats(
         totalWeeksOnChart: 1,
         trackName: item.trackName,
         artistNames: item.artistNames,
+        albumId: item.albumId,
+        albumName: item.albumName,
       };
       updated.push(item.trackId);
     } else {
@@ -39,6 +41,8 @@ export function updateTrackStats(
       // 트랙 메타 업데이트
       existing.trackName = item.trackName;
       existing.artistNames = item.artistNames;
+      existing.albumId = item.albumId;
+      existing.albumName = item.albumName;
     }
   }
   
