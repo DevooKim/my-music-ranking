@@ -12,6 +12,7 @@ type RawPlayedItem = {
   albumImageUrl?: string;
   artistIds?: unknown;
   artistNames?: unknown;
+  artistImageUrls?: unknown;
   durationMs?: unknown;
 };
 
