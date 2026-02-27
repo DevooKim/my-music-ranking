@@ -3,6 +3,7 @@ import type { ChartQueryResult } from "@/lib/charts/types";
 import type { MonthPeriod, YearPeriod, WeekPeriod } from "@/lib/charts/period";
 import { moveMonthPeriod, moveYearPeriod } from "@/lib/charts/period";
 import { ChartList, DetailActionButton } from "@/lib/ui/charts/ChartList";
+import { WeeklyChartSection } from "@/lib/ui/charts/WeeklyChartSection";
 
 type ChartScope = "weekly" | "monthly" | "yearly";
 
@@ -141,7 +142,11 @@ export const ChartPageContent = ({
         </div>
 
         {result.kind === "found" ? (
-          <ChartList items={result.chart.items} chartType={activeScope} />
+          activeScope === "weekly" ? (
+            <WeeklyChartSection items={result.chart.items} />
+          ) : (
+            <ChartList items={result.chart.items} chartType={activeScope} />
+          )
         ) : result.kind === "not_found" ? (
           <section className="rounded-2xl border border-[#ffdb99]/60 bg-[#1f1f1f] p-6 text-[#ffd59a]">
             <p className="text-lg font-semibold">

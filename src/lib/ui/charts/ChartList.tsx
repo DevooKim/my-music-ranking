@@ -81,10 +81,7 @@ export const ChartList = ({ items, chartType }: Props) => {
               : null;
           const peakText = item.peakRank === null ? "-" : `${item.peakRank}`;
           const shouldShowPeakWeeks = item.peakRank !== null || item.weeksOnChart !== null;
-          const coverUrl =
-            item.albumImageUrl && item.albumImageUrl.length > 0
-              ? item.albumImageUrl
-              : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='12' fill='%232a3343'/%3E%3Cpath d='M33 28h30c2.8 0 5 2.2 5 5v25.4c-2.4-1.4-5.2-2.2-8.2-2.2-7.7 0-14 6.3-14 14s6.3 14 14 14c7.7 0 14-6.3 14-14V33c0-1.5-1.5-2.8-3.3-2.8H33c-1.8 0-3.3 1.3-3.3 2.8v30c0 1.5 1.5 2.8 3.3 2.8h1.5V28z' fill='%237af0a6'/%3E%3C/svg%3E";
+          const hasCoverImage = item.albumImageUrl && item.albumImageUrl.length > 0;
           const deltaClass =
             rankDelta === null || rankDelta === 0
               ? "text-[#9ca3af]"
@@ -113,21 +110,23 @@ export const ChartList = ({ items, chartType }: Props) => {
                 <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1ed760] text-sm font-bold text-[#04100a]">
                   {item.rank}
                 </span>
-                <a
-                  href={spotifyAlbumUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`${item.albumName} 앨범 링크`}
-                  className="hover:underline"
-                >
-                  {/* biome-ignore lint/performance/noImgElement: album cover thumbnail from processed data URL */}
-                  <img
-                    src={coverUrl}
-                    alt={item.albumName || item.trackName}
-                    className="h-10 w-10 shrink-0 rounded-lg object-cover sm:h-12 sm:w-12"
-                    loading="lazy"
-                  />
-                </a>
+                {hasCoverImage ? (
+                  <a
+                    href={spotifyAlbumUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${item.albumName} 앨범 링크`}
+                    className="hover:underline"
+                  >
+                    {/* biome-ignore lint/performance/noImgElement: album cover thumbnail from processed data URL */}
+                    <img
+                      src={item.albumImageUrl}
+                      alt={item.albumName || item.trackName}
+                      className="h-10 w-10 shrink-0 rounded-lg object-cover sm:h-12 sm:w-12"
+                      loading="lazy"
+                    />
+                  </a>
+                ) : null}
                 <div className="min-w-0 flex-1">
                   <a
                     href={spotifyAlbumUrl}
@@ -144,15 +143,12 @@ export const ChartList = ({ items, chartType }: Props) => {
                       ? "-"
                       : item.artistNames.map((artistName, index) => {
                           const artistId = item.artistIds[index];
-                          const spotifyArtistUrl = artistId
-                            ? `https://open.spotify.com/artist/${artistId}`
-                            : null;
                           const isLast = index === item.artistNames.length - 1;
                           return (
                             <span key={`${item.trackId}-${artistName}-${index}`}>
-                              {spotifyArtistUrl ? (
+                              {artistId ? (
                                 <a
-                                  href={spotifyArtistUrl}
+                                  href={`https://open.spotify.com/artist/${artistId}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="select-text cursor-pointer hover:underline"
@@ -160,9 +156,7 @@ export const ChartList = ({ items, chartType }: Props) => {
                                   {artistName}
                                 </a>
                               ) : (
-                                <span className="select-text cursor-text">
-                                  {artistName}
-                                </span>
+                                <span className="select-text cursor-text">{artistName}</span>
                               )}
                               {!isLast && ", "}
                             </span>

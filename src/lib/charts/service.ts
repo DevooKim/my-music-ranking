@@ -35,6 +35,7 @@ type RawPlayedItem = RawPlayedDataLike["items"][number] & {
   albumImageUrl?: string;
   artistIds?: unknown;
   artistNames?: unknown;
+  artistImageUrls?: unknown;
   durationMs?: unknown;
   playedAt?: unknown;
   url?: unknown;
@@ -53,6 +54,11 @@ const toChartFromRawWeekly = (
     return Number.isFinite(ms) ? ms : 0;
   };
 
+  const toStringArray = (value: unknown): string[] =>
+    Array.isArray(value)
+      ? value.filter((x): x is string => typeof x === "string" && x.length > 0)
+      : [];
+
   const aggregated = new Map<
     string,
     {
@@ -63,6 +69,7 @@ const toChartFromRawWeekly = (
       albumImageUrl: string;
       artistIds: string[];
       artistNames: string[];
+      artistImageUrls: string[];
       playCount: number;
       totalDurationMs: number;
       lastPlayedAt: number;
@@ -100,6 +107,14 @@ const toChartFromRawWeekly = (
               : null;
         previous.url = candidateUrl;
       }
+
+      const candidateArtistImageUrls = toStringArray(item.artistImageUrls);
+      for (let index = 0; index < candidateArtistImageUrls.length; index += 1) {
+        if (!previous.artistImageUrls[index]) {
+          previous.artistImageUrls[index] = candidateArtistImageUrls[index];
+        }
+      }
+
       return;
     }
 
@@ -115,6 +130,7 @@ const toChartFromRawWeekly = (
       artistNames: Array.isArray(item.artistNames)
         ? item.artistNames.filter((x): x is string => typeof x === "string")
         : [],
+      artistImageUrls: toStringArray(item.artistImageUrls),
       playCount: 1,
       totalDurationMs: Number.isFinite(duration) ? duration : 0,
       lastPlayedAt: playedAt,

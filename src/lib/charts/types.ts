@@ -34,6 +34,7 @@ export interface ChartItem {
   albumImageUrl: string;
   artistIds: string[];
   artistNames: string[];
+  artistImageUrls: string[];
   playCount: number;
   totalDurationMs: number;
   lastRank: number | null;
