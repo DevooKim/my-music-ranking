@@ -1,4 +1,4 @@
-const bucketName =
+export const bucketName =
   process.env.S3_BUCKET_NAME ||
   process.env.AWS_BUCKET_NAME ||
   process.env.S3_BUCKET ||
@@ -6,7 +6,7 @@ const bucketName =
 const region =
   process.env.S3_REGION || "ap-northeast-2";
 
-const buildPublicS3Url = (key: string): string =>
+export const buildPublicS3Url = (key: string): string =>
   `https://s3.${region}.amazonaws.com/${bucketName}/${key
     .split("/")
     .map((segment) => encodeURIComponent(segment))
@@ -23,6 +23,7 @@ export const chartS3Keys = {
     `processed/monthly/${year}/monthly-month-${pad2(month)}.json`,
   yearly: (year: number) => `processed/yearly/yearly-${year}.json`,
   trackStats: () => "metadata/track-stats.json",
+  trackStatsParquet: () => "metadata/track-stats.parquet",
 };
 
 const isNotFoundError = (error: unknown): boolean => {
