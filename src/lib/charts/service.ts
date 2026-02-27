@@ -139,7 +139,6 @@ const toChartFromRawWeekly = (
 
       return a.trackName.localeCompare(b.trackName, "en");
     })
-    .slice(0, 100)
     .map<ChartResponse["items"][number]>((entry, index) => {
       const { lastPlayedAt: _lastPlayedAt, ...item } = entry;
       return {
