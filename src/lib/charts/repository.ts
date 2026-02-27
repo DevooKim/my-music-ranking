@@ -205,7 +205,7 @@ const readTrackStatsFromParquet = async (): Promise<WeeklyTrackStats | null> => 
 
   return normalized;
 };
- 
+
 const toStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((x): x is string => typeof x === "string" && x.length > 0) : [];
 
