@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ChartItem as ChartListItem } from "@/lib/charts/types";
 
@@ -144,25 +145,18 @@ export const ChartList = ({ items, chartType }: Props) => {
                       ? "-"
                       : item.artistNames.map((artistName, index) => {
                           const artistId = item.artistIds[index];
-                          const spotifyArtistUrl = artistId
-                            ? `https://open.spotify.com/artist/${artistId}`
-                            : null;
                           const isLast = index === item.artistNames.length - 1;
                           return (
                             <span key={`${item.trackId}-${artistName}-${index}`}>
-                              {spotifyArtistUrl ? (
-                                <a
-                                  href={spotifyArtistUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                              {artistId ? (
+                                <Link
+                                  href={`/artist/${artistId}`}
                                   className="select-text cursor-pointer hover:underline"
                                 >
                                   {artistName}
-                                </a>
+                                </Link>
                               ) : (
-                                <span className="select-text cursor-text">
-                                  {artistName}
-                                </span>
+                                <span className="select-text cursor-text">{artistName}</span>
                               )}
                               {!isLast && ", "}
                             </span>
