@@ -7,6 +7,7 @@ export type ArtistChartItem = {
   playCount: number;
   totalDurationMs: number;
   trackCount: number;
+  artistImageUrl: string | null;
 };
 
 export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => {
@@ -17,6 +18,7 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
       playCount: number;
       totalDurationMs: number;
       trackIds: Set<string>;
+      artistImageUrl: string | null;
     }
   >();
 
@@ -26,6 +28,7 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
     for (let index = 0; index < artistsLength; index += 1) {
       const artistId = item.artistIds[index];
       const artistName = item.artistNames[index];
+      const artistImageUrl = item.artistImageUrls[index] || null;
 
       if (!artistId || !artistName) continue;
 
@@ -35,6 +38,9 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
         current.playCount += item.playCount;
         current.totalDurationMs += item.totalDurationMs;
         current.trackIds.add(item.trackId);
+        if (!current.artistImageUrl && artistImageUrl) {
+          current.artistImageUrl = artistImageUrl;
+        }
         continue;
       }
 
@@ -43,6 +49,7 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
         playCount: item.playCount,
         totalDurationMs: item.totalDurationMs,
         trackIds: new Set([item.trackId]),
+        artistImageUrl,
       });
     }
   }
@@ -66,5 +73,6 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
       playCount: value.playCount,
       totalDurationMs: value.totalDurationMs,
       trackCount: value.trackIds.size,
+      artistImageUrl: value.artistImageUrl,
     }));
 };

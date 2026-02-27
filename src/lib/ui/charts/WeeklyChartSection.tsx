@@ -6,6 +6,8 @@ import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
 import type { ChartItem } from "@/lib/charts/types";
 import { ChartList } from "@/lib/ui/charts/ChartList";
 
+/* eslint-disable @next/next/no-img-element */
+
 const MOBILE_BREAKPOINT = 640;
 const ITEM_HEIGHT = 82;
 
@@ -47,9 +49,17 @@ const ArtistChartList = ({ items }: { items: ReturnType<typeof buildArtistChartI
                 <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1ed760] text-sm font-bold text-[#04100a]">
                   {artist.rank}
                 </span>
+                {artist.artistImageUrl ? (
+                  <img
+                    src={artist.artistImageUrl}
+                    alt={artist.artistName}
+                    className="h-10 w-10 shrink-0 rounded-full object-cover"
+                    loading="lazy"
+                  />
+                ) : null}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold text-[#eef2fb] sm:text-base">{artist.artistName}</p>
-                  <p className="mt-0.5 text-xs text-[#9ca3af]">참여 트랙 {artist.trackCount.toLocaleString("ko-KR")}곡</p>
+                  <p className="mt-0.5 text-xs text-[#9ca3af]">트랙 {artist.trackCount.toLocaleString("ko-KR")}곡</p>
                 </div>
                 <p className="text-right text-xs text-[#d1dce9] sm:text-sm">
                   재생 {artist.playCount.toLocaleString("ko-KR")}회
