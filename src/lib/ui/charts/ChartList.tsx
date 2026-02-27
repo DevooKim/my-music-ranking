@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ChartItem as ChartListItem } from "@/lib/charts/types";
 
@@ -149,12 +148,14 @@ export const ChartList = ({ items, chartType }: Props) => {
                           return (
                             <span key={`${item.trackId}-${artistName}-${index}`}>
                               {artistId ? (
-                                <Link
-                                  href={`/artist/${artistId}`}
+                                <a
+                                  href={`https://open.spotify.com/artist/${artistId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
                                   className="select-text cursor-pointer hover:underline"
                                 >
                                   {artistName}
-                                </Link>
+                                </a>
                               ) : (
                                 <span className="select-text cursor-text">{artistName}</span>
                               )}
