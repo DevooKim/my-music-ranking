@@ -11,6 +11,7 @@ const MOBILE_BREAKPOINT = 640;
 const ITEM_HEIGHT = 98;
 const ITEM_HEIGHT_MOBILE = 78;
 const ITEM_GAP_MOBILE = 10;
+const ITEM_GAP = 10;
 
 type Props = {
   items: ChartListItem[];
@@ -48,7 +49,7 @@ export const ChartList = ({ items, chartType }: Props) => {
     getScrollElement: () =>
       typeof document === "undefined" ? null : document.documentElement,
     estimateSize: () =>
-      isMobile ? ITEM_HEIGHT_MOBILE + ITEM_GAP_MOBILE : ITEM_HEIGHT,
+      isMobile ? ITEM_HEIGHT_MOBILE + ITEM_GAP_MOBILE : ITEM_HEIGHT + ITEM_GAP,
     overscan: 6,
   });
 
@@ -94,11 +95,9 @@ export const ChartList = ({ items, chartType }: Props) => {
                 ? "text-[#1ed760]"
                 : "text-[#f97373]";
           const rowSize = virtualRow.size ??
-            (isMobile ? ITEM_HEIGHT_MOBILE + ITEM_GAP_MOBILE : ITEM_HEIGHT);
-          const visualHeight = isMobile
-            ? Math.max(56, rowSize - ITEM_GAP_MOBILE)
-            : rowSize;
-          const topOffset = isMobile ? ITEM_GAP_MOBILE / 2 : 0;
+            (isMobile ? ITEM_HEIGHT_MOBILE + ITEM_GAP_MOBILE : ITEM_HEIGHT + ITEM_GAP);
+          const visualHeight = Math.max(56, rowSize - ITEM_GAP);
+          const topOffset = ITEM_GAP / 2;
           const spotifyAlbumUrl = `https://open.spotify.com/album/${item.albumId}`;
 
           return (
@@ -111,7 +110,7 @@ export const ChartList = ({ items, chartType }: Props) => {
                 height: `${visualHeight}px`,
               }}
             >
-              <div className="flex h-full w-full items-center gap-2 rounded-xl border border-white/10 bg-[#0e121b] px-2.5 py-2 transition-colors hover:bg-[#141c2a] sm:gap-4 sm:px-4 sm:py-3">
+              <div className="flex h-full w-full items-center gap-2 rounded-xl border border-white/10 bg-[#0e121b] px-3 transition-colors hover:bg-[#141c2a] sm:gap-4 sm:px-4">
                 <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1ed760] text-sm font-bold text-[#04100a]">
                   {item.rank}
                 </span>
