@@ -1,4 +1,3 @@
-import { getDuckDB, queryAll } from "@/lib/duckdb/client";
 import type { ChartItem } from "@/lib/types/played";
 
 const BUCKET = process.env.S3_BUCKET || "my-music-ranking";
@@ -36,7 +35,8 @@ export async function aggregatePlaysFromS3(
   s3Pattern: string,
   limit = 100
 ): Promise<AggregatedTrack[]> {
-  const conn = await getDuckDB();
+  const duckdbClient = await import("@/lib/duckdb/client");
+  const conn = await duckdbClient.getDuckDB();
   const s3Path = `s3://${BUCKET}/${s3Pattern}`;
   
   const sql = `
@@ -64,7 +64,7 @@ export async function aggregatePlaysFromS3(
     LIMIT ${limit}
   `;
   
-  const rows = await queryAll<AggregatedRow>(conn, sql);
+  const rows = await duckdbClient.queryAll<AggregatedRow>(conn, sql);
   
   return rows.map((row) => ({
     trackId: row.trackId,

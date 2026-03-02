@@ -1,7 +1,6 @@
 import { unstable_cache } from "next/cache";
 
 import { getCachePolicy } from "@/lib/charts/cache-policy";
-import { getDuckDB, queryAll } from "@/lib/duckdb/client";
 import { buildPublicS3Url, chartS3Keys, getJsonFromS3 } from "@/lib/charts/s3";
 import type { CachePolicyScope, ChartResponse } from "@/lib/charts/types";
 
@@ -185,10 +184,24 @@ const readTrackStatsFromJson = async (): Promise<WeeklyTrackStats | null> => {
 };
 
 const readTrackStatsFromParquet = async (): Promise<WeeklyTrackStats | null> => {
-  const connection = await getDuckDB();
+  let duckdbClient: typeof import("@/lib/duckdb/client");
+  try {
+    duckdbClient = await import("@/lib/duckdb/client");
+  } catch (error) {
+    console.error("DuckDB is not available. Fallback to track-stats json.", error);
+    return null;
+  }
+
+  const connection = await duckdbClient.getDuckDB();
   const parquetUrl = buildPublicS3Url(chartS3Keys.trackStatsParquet());
   const sql = `SELECT trackId, weeklyPeakRank, totalWeeksOnChart FROM read_parquet('${parquetUrl}')`;
-  const rows = await queryAll<TrackStatsRow>(connection, sql);
+  let rows: TrackStatsRow[];
+  try {
+    rows = await duckdbClient.queryAll<TrackStatsRow>(connection, sql);
+  } catch (error) {
+    console.error("Failed to read track stats from parquet. Fallback to json.", error);
+    return null;
+  }
 
   if (!rows.length) return null;
 
