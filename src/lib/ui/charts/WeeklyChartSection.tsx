@@ -85,7 +85,7 @@ const ArtistChartList = ({ items }: ArtistChartListProps) => {
                     트랙 {artist.trackCount.toLocaleString("ko-KR")}곡
                   </p>
                 </div>
-                <p className="text-right text-xs text-[#d1dce9] sm:text-sm">
+                <p className="text-right font-semibold text-xs text-white sm:text-sm">
                   재생 {artist.playCount.toLocaleString("ko-KR")}회
                 </p>
               </div>

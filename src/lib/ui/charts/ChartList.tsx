@@ -72,21 +72,33 @@ export const ChartList = ({ items, chartType }: Props) => {
       >
             {virtualItems.map((virtualRow) => {
               const item = items[virtualRow.index];
+              const isCurrentWeekOnlyData =
+                chartType === "weekly" &&
+                item.lastRank === null &&
+                item.peakRank === null &&
+                item.weeksOnChart === null &&
+                item.entryStatus === null;
               const artistNames = Array.isArray(item.artistNames)
                 ? item.artistNames
                 : [];
               const artistIds = Array.isArray(item.artistIds) ? item.artistIds : [];
 
               const statusText = toEntryStatusText(item.entryStatus);
-              const rankDelta = item.lastRank === null ? null : item.lastRank - item.rank;
+              const showStatus = !isCurrentWeekOnlyData && statusText !== null;
+              const rankDelta =
+                isCurrentWeekOnlyData || item.lastRank === null
+                  ? null
+                  : item.lastRank - item.rank;
               const rankDeltaText =
-                statusText === null && rankDelta !== null
+                !isCurrentWeekOnlyData && statusText === null && rankDelta !== null
                   ? rankDelta === 0
                 ? "-"
                 : `${rankDelta > 0 ? "▲" : "▼"} ${Math.abs(rankDelta)}`
               : null;
           const peakText = item.peakRank === null ? "-" : `${item.peakRank}`;
-          const shouldShowPeakWeeks = item.peakRank !== null || item.weeksOnChart !== null;
+          const shouldShowPeakWeeks =
+            !isCurrentWeekOnlyData &&
+            (item.peakRank !== null || item.weeksOnChart !== null);
           const hasCoverImage = item.albumImageUrl && item.albumImageUrl.length > 0;
           const deltaClass =
             rankDelta === null || rankDelta === 0
@@ -169,11 +181,15 @@ export const ChartList = ({ items, chartType }: Props) => {
                   </p>
                 </div>
                 <div className="w-auto text-left text-xs text-[#9ca3af] sm:hidden">
-                  <p className="truncate text-[11px] font-semibold text-white">
+                  <p
+                    className={`truncate font-semibold text-white ${
+                      isCurrentWeekOnlyData ? "text-xs" : "text-[11px]"
+                    }`}
+                  >
                     재생 {item.playCount.toLocaleString("ko-KR")}회
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {statusText ? (
+                    {showStatus ? (
                       <span
                         className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${toStatusClassName(item.entryStatus)}`}
                       >
@@ -198,34 +214,36 @@ export const ChartList = ({ items, chartType }: Props) => {
                   ) : null}
                 </div>
                 <div className="hidden text-right text-xs text-[#9ca3af] sm:block">
-                  <p className="font-semibold text-white">
+                  <p className="font-semibold text-white sm:text-sm">
                     재생 {item.playCount.toLocaleString("ko-KR")}회
                   </p>
                 </div>
-                <div className="hidden w-44 text-right text-[11px] text-[#d1dce9] sm:block">
-                  <div className="mb-2 flex items-center justify-end gap-2">
-                    {statusText ? (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${toStatusClassName(item.entryStatus)}`}
-                      >
-                        {statusText}
-                      </span>
-                    ) : null}
-                    {rankDeltaText ? (
-                      <span className={`font-medium ${deltaClass}`}>
-                        {getDeltaLabel(chartType)} {rankDeltaText}
-                      </span>
+                {!isCurrentWeekOnlyData ? (
+                  <div className="hidden w-44 text-right text-[11px] text-[#d1dce9] sm:block">
+                    <div className="mb-2 flex items-center justify-end gap-2">
+                      {showStatus ? (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${toStatusClassName(item.entryStatus)}`}
+                        >
+                          {statusText}
+                        </span>
+                      ) : null}
+                      {rankDeltaText ? (
+                        <span className={`font-medium ${deltaClass}`}>
+                          {getDeltaLabel(chartType)} {rankDeltaText}
+                        </span>
+                      ) : null}
+                    </div>
+                    {shouldShowPeakWeeks ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="font-medium">PEAK {peakText}</span>
+                        <span className="text-[10px] text-[#7b8494]">
+                          WEEKS {item.weeksOnChart ?? "-"}
+                        </span>
+                      </div>
                     ) : null}
                   </div>
-                  {shouldShowPeakWeeks ? (
-                    <div className="flex items-center justify-end gap-2">
-                      <span className="font-medium">PEAK {peakText}</span>
-                      <span className="text-[10px] text-[#7b8494]">
-                        WEEKS {item.weeksOnChart ?? "-"}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
+                ) : null}
               </div>
             </li>
           );
