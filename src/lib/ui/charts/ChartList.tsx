@@ -198,13 +198,11 @@ export const ChartList = ({ items, chartType }: Props) => {
                     </div>
                   ) : null}
                 </div>
-                <div className="hidden text-right text-xs text-[#9ca3af] sm:block">
-                  <p className="font-semibold text-white">
+                <div className="hidden w-44 text-right sm:block">
+                  <p className="text-right text-xs text-[#d1dce9] sm:text-sm">
                     재생 {item.playCount.toLocaleString("ko-KR")}회
                   </p>
-                </div>
-                <div className="hidden w-44 text-right text-[11px] text-[#d1dce9] sm:block">
-                  <div className="mb-2 flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-2">
                     {statusText ? (
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${toStatusClassName(item.entryStatus)}`}
@@ -219,7 +217,7 @@ export const ChartList = ({ items, chartType }: Props) => {
                     ) : null}
                   </div>
                   {shouldShowPeakWeeks ? (
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="mt-1 flex items-center justify-end gap-2">
                       <span className="font-medium">PEAK {peakText}</span>
                       <span className="text-[10px] text-[#7b8494]">
                         WEEKS {item.weeksOnChart ?? "-"}
