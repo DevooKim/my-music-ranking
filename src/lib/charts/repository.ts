@@ -187,10 +187,8 @@ const readTrackStatsFromJson = async (): Promise<WeeklyTrackStats | null> => {
 const readTrackStatsFromParquet = async (): Promise<WeeklyTrackStats | null> => {
   const connection = await getDuckDB();
   const parquetUrl = buildPublicS3Url(chartS3Keys.trackStatsParquet());
-  const rows = await queryAll<TrackStatsRow>(
-    connection,
-    `SELECT trackId, weeklyPeakRank, totalWeeksOnChart FROM read_parquet('${parquetUrl}')`,
-  );
+  const sql = `SELECT trackId, weeklyPeakRank, totalWeeksOnChart FROM read_parquet('${parquetUrl}')`;
+  const rows = await queryAll<TrackStatsRow>(connection, sql);
 
   if (!rows.length) return null;
 
