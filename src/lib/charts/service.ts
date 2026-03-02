@@ -277,10 +277,7 @@ const applyRawWeeklyHistory = (
       if (!previous) {
         const hasEverAppeared = wasTrackSeenBefore(trackStats, item.trackId);
         const wasRecentlySeen = recentTrackIds?.has(item.trackId) ?? false;
-        const peakFromTrackStats = getTrackPeakRankFromStats(
-          trackStats,
-          item.trackId,
-        );
+        const peakFromTrackStats = getTrackPeakRankFromStats(trackStats, item.trackId);
 
         return {
           ...item,
@@ -427,15 +424,7 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
       });
     }
 
-    const { recentTrackIds, trackStats } =
-      await getRecentAndEverSeenWeeklyTrackIds(period, "latest");
-    const previousWeekChart = await getPreviousWeekChartForRaw(period, "latest");
-    const chart = applyRawWeeklyHistory(
-      toChartFromRawWeekly(rawChart, period),
-      previousWeekChart,
-      trackStats,
-      recentTrackIds,
-    );
+    const chart = toChartFromRawWeekly(rawChart, period);
 
     return {
       kind: "found",
@@ -473,11 +462,7 @@ export const getWeeklyChart = async (
   try {
     const chart = await getWeeklyChartFromS3(isoYear, isoWeek, lookupScope);
     if (!chart) {
-      const rawChart = await getWeeklyRawChartFromS3(
-        isoYear,
-        isoWeek,
-        lookupScope,
-      );
+      const rawChart = await getWeeklyRawChartFromS3(isoYear, isoWeek, lookupScope);
       if (rawChart && rawChart.items.length > 0) {
         const { recentTrackIds, trackStats } =
           await getRecentAndEverSeenWeeklyTrackIds(period, lookupScope);
