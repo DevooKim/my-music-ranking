@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
-import type { ChartItem } from "@/lib/charts/types";
+import type { ArtistChartItem, ChartItem } from "@/lib/charts/types";
 import { ChartList } from "@/lib/ui/charts/ChartList";
 
 /* eslint-disable @next/next/no-img-element */
@@ -16,11 +16,16 @@ const ITEM_GAP = 10;
 
 type WeeklyChartSectionProps = {
   items: ChartItem[];
+  artistItems?: ArtistChartItem[];
 };
 
 type ViewMode = "track" | "artist";
 
-const ArtistChartList = ({ items }: { items: ReturnType<typeof buildArtistChartItems> }) => {
+type ArtistChartListProps = {
+  items: ArtistChartItem[];
+};
+
+const ArtistChartList = ({ items }: ArtistChartListProps) => {
   const isMobile =
     typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
 
@@ -92,9 +97,15 @@ const ArtistChartList = ({ items }: { items: ReturnType<typeof buildArtistChartI
   );
 };
 
-export const WeeklyChartSection = ({ items }: WeeklyChartSectionProps) => {
+export const WeeklyChartSection = ({
+  items,
+  artistItems: providedArtistItems,
+}: WeeklyChartSectionProps) => {
   const [viewMode, setViewMode] = useState<ViewMode>("track");
-  const artistItems = useMemo(() => buildArtistChartItems(items), [items]);
+  const artistItems = useMemo(
+    () => providedArtistItems ?? buildArtistChartItems(items),
+    [providedArtistItems, items],
+  );
 
   return (
     <div className="space-y-5">

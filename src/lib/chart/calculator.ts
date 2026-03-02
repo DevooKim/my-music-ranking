@@ -12,6 +12,7 @@ interface AggregatedRow {
   artistNames: string; // JSON 배열 문자열
   playCount: number;
   totalDurationMs: number;
+  firstPlayedAt: unknown;
 }
 
 export interface AggregatedTrack {
@@ -24,7 +25,21 @@ export interface AggregatedTrack {
   artistNames: string[];
   playCount: number;
   totalDurationMs: number;
+  firstPlayedAt: number;
 }
+
+const normalizeFirstPlayedAt = (value: unknown): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+};
 
 /**
  * S3의 raw JSON 파일들을 DuckDB로 집계
@@ -54,13 +69,14 @@ export async function aggregatePlaysFromS3(
       json(item.artistIds) as artistIds,
       json(item.artistNames) as artistNames,
       COUNT(*) as playCount,
-      SUM(item.durationMs) as totalDurationMs
+      SUM(item.durationMs) as totalDurationMs,
+      MIN(CAST(item.playedAt AS TIMESTAMP)) as firstPlayedAt
     FROM flattened
     GROUP BY 
       item.trackId, item.trackName, item.albumId, 
       item.albumName, item.albumImageUrl, 
       item.artistIds, item.artistNames
-    ORDER BY playCount DESC
+    ORDER BY playCount DESC, firstPlayedAt ASC
     LIMIT ${limit}
   `;
   
@@ -76,6 +92,7 @@ export async function aggregatePlaysFromS3(
     artistNames: JSON.parse(row.artistNames),
     playCount: Number(row.playCount),
     totalDurationMs: Number(row.totalDurationMs),
+    firstPlayedAt: normalizeFirstPlayedAt(row.firstPlayedAt),
   }));
 }
 

@@ -37,10 +37,21 @@ export interface ChartItem {
   artistImageUrls: string[];
   playCount: number;
   totalDurationMs: number;
+  firstPlayedAt?: number;
   lastRank: number | null;
   peakRank: number | null;
   weeksOnChart: number | null;
   entryStatus: ChartEntryStatus | null;
+}
+
+export interface ArtistChartItem {
+  rank: number;
+  artistId: string;
+  artistName: string;
+  playCount: number;
+  totalDurationMs: number;
+  trackCount: number;
+  artistImageUrl: string | null;
 }
 
 export interface ChartResponse {
@@ -64,6 +75,7 @@ export interface ChartFoundResult {
   kind: "found";
   chart: ChartResponse;
   cachePolicy: CachePolicyInfo;
+  artistItems?: ArtistChartItem[];
 }
 
 export interface ChartNotFoundResult {

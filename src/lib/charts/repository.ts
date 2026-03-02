@@ -2,7 +2,12 @@ import { unstable_cache } from "next/cache";
 
 import { getCachePolicy } from "@/lib/charts/cache-policy";
 import { buildPublicS3Url, chartS3Keys, getJsonFromS3 } from "@/lib/charts/s3";
-import type { CachePolicyScope, ChartResponse } from "@/lib/charts/types";
+import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
+import type {
+  ArtistChartItem,
+  CachePolicyScope,
+  ChartResponse,
+} from "@/lib/charts/types";
 
 type RawPlayedItem = {
   trackId?: string;
@@ -54,6 +59,25 @@ interface TrackStatsScopeLookup {
   not_found: () => Promise<WeeklyTrackStats | null>;
   latest: () => Promise<WeeklyTrackStats | null>;
   latest_not_found: () => Promise<WeeklyTrackStats | null>;
+}
+
+interface ArtistChartScopeLookup {
+  found: (
+    isoYear: number,
+    isoWeek: number,
+  ) => Promise<ArtistChartItem[] | null>;
+  not_found: (
+    isoYear: number,
+    isoWeek: number,
+  ) => Promise<ArtistChartItem[] | null>;
+  latest: (
+    isoYear: number,
+    isoWeek: number,
+  ) => Promise<ArtistChartItem[] | null>;
+  latest_not_found: (
+    isoYear: number,
+    isoWeek: number,
+  ) => Promise<ArtistChartItem[] | null>;
 }
 
 const isRawPlayedItem = (value: unknown): value is RawPlayedItem => {
@@ -310,8 +334,46 @@ const cachedYearlyCharts: CacheScopeLookup = {
   latest_not_found: createCachedJsonLookup("latest_not_found", "chart:yearly"),
 };
 
+const createCachedWeeklyArtistLookup = (
+  scope: CachePolicyScope,
+): ((
+  isoYear: number,
+  isoWeek: number,
+) => Promise<ArtistChartItem[] | null>) => {
+  const policy = getCachePolicy(scope);
+
+  return (isoYear: number, isoWeek: number): Promise<ArtistChartItem[] | null> =>
+    unstable_cache(
+      async (): Promise<ArtistChartItem[] | null> => {
+        const chart = await getWeeklyChartFromS3(isoYear, isoWeek, scope);
+        if (!chart) return null;
+        return buildArtistChartItems(chart.items);
+      },
+      ["chart:artist-weekly", scope, isoYear, isoWeek],
+      {
+        revalidate: policy.maxAgeSeconds,
+      },
+    )();
+};
+
+const createCachedWeeklyArtistLookups = (): Record<
+  CachePolicyScope,
+  (
+    isoYear: number,
+    isoWeek: number,
+  ) => Promise<ArtistChartItem[] | null>
+> => ({
+  found: createCachedWeeklyArtistLookup("found"),
+  not_found: createCachedWeeklyArtistLookup("not_found"),
+  latest: createCachedWeeklyArtistLookup("latest"),
+  latest_not_found: createCachedWeeklyArtistLookup("latest_not_found"),
+});
+
 const resolveScope = (scope: CachePolicyScope | undefined): CachePolicyScope =>
   scope ?? "found";
+
+const cachedWeeklyArtistCharts: ArtistChartScopeLookup =
+  createCachedWeeklyArtistLookups();
 
 export const getWeeklyChartFromS3 = async (
   isoYear: number,
@@ -324,6 +386,15 @@ export const getWeeklyChartFromS3 = async (
   );
   if (!raw || !isChartResponse(raw)) return null;
   return normalizeChartResponse(raw);
+};
+
+export const getWeeklyArtistChartFromS3 = async (
+  isoYear: number,
+  isoWeek: number,
+  scope: CachePolicyScope = "found",
+): Promise<ArtistChartItem[] | null> => {
+  const cacheScope = resolveScope(scope);
+  return cachedWeeklyArtistCharts[cacheScope](isoYear, isoWeek);
 };
 
 export const getWeeklyRawChartFromS3 = async (

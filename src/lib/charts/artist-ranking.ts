@@ -1,16 +1,21 @@
-import type { ChartItem } from "@/lib/charts/types";
-
-export type ArtistChartItem = {
-  rank: number;
-  artistId: string;
-  artistName: string;
-  playCount: number;
-  totalDurationMs: number;
-  trackCount: number;
-  artistImageUrl: string | null;
-};
+import type { ArtistChartItem, ChartItem } from "@/lib/charts/types";
 
 export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => {
+  const defaultFirstPlayedAt = Number.MAX_SAFE_INTEGER;
+
+  const parseFirstPlayedAt = (value: unknown): number => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === "string" && value.length > 0) {
+      const parsed = Date.parse(value);
+      return Number.isFinite(parsed) ? parsed : defaultFirstPlayedAt;
+    }
+
+    return defaultFirstPlayedAt;
+  };
+
   const byArtist = new Map<
     string,
     {
@@ -19,6 +24,7 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
       totalDurationMs: number;
       trackIds: Set<string>;
       artistImageUrl: string | null;
+      firstPlayedAt: number;
     }
   >();
 
@@ -28,6 +34,9 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
     const artistImageUrls = Array.isArray(item.artistImageUrls)
       ? item.artistImageUrls
       : [];
+    const firstPlayedAt = parseFirstPlayedAt(
+      (item as ChartItem & { firstPlayedAt?: unknown }).firstPlayedAt,
+    );
 
     const artistsLength = Math.max(artistIds.length, artistNames.length);
 
@@ -44,6 +53,9 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
         current.playCount += item.playCount;
         current.totalDurationMs += item.totalDurationMs;
         current.trackIds.add(item.trackId);
+        if (firstPlayedAt < current.firstPlayedAt) {
+          current.firstPlayedAt = firstPlayedAt;
+        }
         if (!current.artistImageUrl && artistImageUrl) {
           current.artistImageUrl = artistImageUrl;
         }
@@ -55,6 +67,7 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
         playCount: item.playCount,
         totalDurationMs: item.totalDurationMs,
         trackIds: new Set([item.trackId]),
+        firstPlayedAt,
         artistImageUrl,
       });
     }
@@ -66,11 +79,7 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
         return b[1].playCount - a[1].playCount;
       }
 
-      if (b[1].totalDurationMs !== a[1].totalDurationMs) {
-        return b[1].totalDurationMs - a[1].totalDurationMs;
-      }
-
-      return a[1].artistName.localeCompare(b[1].artistName, "ko");
+      return a[1].firstPlayedAt - b[1].firstPlayedAt;
     })
     .map(([artistId, value], index) => ({
       rank: index + 1,

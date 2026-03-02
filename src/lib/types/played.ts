@@ -56,6 +56,7 @@ export interface ChartItem {
   artistNames: string[];
   playCount: number;
   totalDurationMs: number;
+  firstPlayedAt?: number;
   lastRank: number | null;
   peakRank: number | null;
   weeksOnChart: number | null;
