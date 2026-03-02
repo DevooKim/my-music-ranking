@@ -69,13 +69,18 @@ export const ChartList = ({ items, chartType }: Props) => {
         className="relative w-full px-1"
         style={{ height: `${virtualizer.getTotalSize()}px` }}
       >
-        {virtualItems.map((virtualRow) => {
-          const item = items[virtualRow.index];
-          const statusText = toEntryStatusText(item.entryStatus);
-          const rankDelta = item.lastRank === null ? null : item.lastRank - item.rank;
-          const rankDeltaText =
-            statusText === null && rankDelta !== null
-              ? rankDelta === 0
+            {virtualItems.map((virtualRow) => {
+              const item = items[virtualRow.index];
+              const artistNames = Array.isArray(item.artistNames)
+                ? item.artistNames
+                : [];
+              const artistIds = Array.isArray(item.artistIds) ? item.artistIds : [];
+
+              const statusText = toEntryStatusText(item.entryStatus);
+              const rankDelta = item.lastRank === null ? null : item.lastRank - item.rank;
+              const rankDeltaText =
+                statusText === null && rankDelta !== null
+                  ? rankDelta === 0
                 ? "-"
                 : `${rankDelta > 0 ? "▲" : "▼"} ${Math.abs(rankDelta)}`
               : null;
@@ -139,11 +144,11 @@ export const ChartList = ({ items, chartType }: Props) => {
                     </p>
                   </a>
                   <p className="mt-0.5 truncate text-xs text-[#9ca3af]">
-                    {item.artistNames.length === 0
+                    {artistNames.length === 0
                       ? "-"
-                      : item.artistNames.map((artistName, index) => {
-                          const artistId = item.artistIds[index];
-                          const isLast = index === item.artistNames.length - 1;
+                      : artistNames.map((artistName, index) => {
+                          const artistId = artistIds[index];
+                          const isLast = index === artistNames.length - 1;
                           return (
                             <span key={`${item.trackId}-${artistName}-${index}`}>
                               {artistId ? (

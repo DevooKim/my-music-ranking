@@ -23,12 +23,18 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
   >();
 
   for (const item of items) {
-    const artistsLength = Math.max(item.artistIds.length, item.artistNames.length);
+    const artistIds = Array.isArray(item.artistIds) ? item.artistIds : [];
+    const artistNames = Array.isArray(item.artistNames) ? item.artistNames : [];
+    const artistImageUrls = Array.isArray(item.artistImageUrls)
+      ? item.artistImageUrls
+      : [];
+
+    const artistsLength = Math.max(artistIds.length, artistNames.length);
 
     for (let index = 0; index < artistsLength; index += 1) {
-      const artistId = item.artistIds[index];
-      const artistName = item.artistNames[index];
-      const artistImageUrl = item.artistImageUrls[index] || null;
+      const artistId = artistIds[index];
+      const artistName = artistNames[index];
+      const artistImageUrl = artistImageUrls[index] || null;
 
       if (!artistId || !artistName) continue;
 

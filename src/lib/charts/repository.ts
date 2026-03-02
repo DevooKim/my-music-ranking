@@ -71,21 +71,33 @@ const isChartResponse = (value: unknown): value is ChartResponse => {
   );
 };
 
+const toStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((x): x is string => typeof x === "string" && x.length > 0) : [];
+
+const normalizeChartResponse = (value: ChartResponse): ChartResponse => ({
+  ...value,
+  items: value.items.map((item) => ({
+    ...item,
+    artistIds: toStringArray(item.artistIds),
+    artistNames: toStringArray(item.artistNames),
+    artistImageUrls: toStringArray(item.artistImageUrls),
+  })),
+});
+
 const createCachedJsonLookup = <T>(
   scope: CachePolicyScope,
   category: string,
 ): ((key: string) => Promise<T | null>) => {
   const policy = getCachePolicy(scope);
 
-  return unstable_cache(
-    async (key: string): Promise<T | null> => {
-      return getJsonFromS3<T>(key);
-    },
-    [category, scope],
-    {
-      revalidate: policy.maxAgeSeconds,
-    },
-  );
+  return (key: string): Promise<T | null> =>
+    unstable_cache(
+      async () => getJsonFromS3<T>(key),
+      [category, scope, key],
+      {
+        revalidate: policy.maxAgeSeconds,
+      },
+    )();
 };
 
 const cachedWeeklyCharts: CacheScopeLookup = {
@@ -133,7 +145,7 @@ export const getWeeklyChartFromS3 = async (
   );
 
   if (!raw || !isChartResponse(raw)) return null;
-  return raw as ChartResponse;
+  return normalizeChartResponse(raw);
 };
 
 export const getWeeklyRawChartFromS3 = async (
@@ -170,7 +182,7 @@ export const getMonthlyChartFromS3 = async (
     chartS3Keys.monthly(year, month),
   );
   if (!raw || !isChartResponse(raw)) return null;
-  return raw as ChartResponse;
+  return normalizeChartResponse(raw);
 };
 
 export const getYearlyChartFromS3 = async (
@@ -180,5 +192,5 @@ export const getYearlyChartFromS3 = async (
   const cacheScope = resolveScope(scope);
   const raw = await cachedYearlyCharts[cacheScope](chartS3Keys.yearly(year));
   if (!raw || !isChartResponse(raw)) return null;
-  return raw as ChartResponse;
+  return normalizeChartResponse(raw);
 };
