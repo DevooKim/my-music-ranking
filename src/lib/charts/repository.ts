@@ -349,7 +349,7 @@ const createCachedWeeklyArtistLookup = (
         if (!chart) return null;
         return buildArtistChartItems(chart.items);
       },
-      ["chart:artist-weekly", scope, isoYear, isoWeek],
+      ["chart:artist-weekly", scope, String(isoYear), String(isoWeek)],
       {
         revalidate: policy.maxAgeSeconds,
       },
