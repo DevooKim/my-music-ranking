@@ -2,6 +2,7 @@
 
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ChartItem as ChartListItem } from "@/lib/charts/types";
+import Link from "next/link";
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -242,10 +243,10 @@ export const DetailActionButton = ({
   href: string;
   label: string;
 }) => (
-  <a
+  <Link
     href={href}
     className="rounded-full border border-white/20 bg-black/20 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
   >
     {label}
-  </a>
+  </Link>
 );
