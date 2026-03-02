@@ -12,6 +12,7 @@ import {
 } from "@/lib/charts/period";
 import {
   getMonthlyChartFromS3,
+  getWeeklyArtistChartFromS3,
   getTrackStatsForWeekly,
   getWeeklyChartFromS3,
   getWeeklyRawChartFromS3,
@@ -28,6 +29,7 @@ import type {
   ChartResponse,
   NotReadyChartResponse,
 } from "@/lib/charts/types";
+import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
 
 type RawPlayedItem = RawPlayedDataLike["items"][number] & {
   trackName?: string;
@@ -74,6 +76,7 @@ const toChartFromRawWeekly = (
       playCount: number;
       totalDurationMs: number;
       lastPlayedAt: number;
+      firstPlayedAt: number;
       url: string | null;
     }
   >();
@@ -98,6 +101,9 @@ const toChartFromRawWeekly = (
       previous.totalDurationMs += Number.isFinite(duration) ? duration : 0;
       if (playedAt > previous.lastPlayedAt) {
         previous.lastPlayedAt = playedAt;
+      }
+      if (playedAt < previous.firstPlayedAt) {
+        previous.firstPlayedAt = playedAt;
       }
       if (!previous.url) {
         const candidateUrl =
@@ -135,6 +141,7 @@ const toChartFromRawWeekly = (
       playCount: 1,
       totalDurationMs: Number.isFinite(duration) ? duration : 0,
       lastPlayedAt: playedAt,
+      firstPlayedAt: playedAt,
       url:
         typeof item.url === "string"
           ? item.url
@@ -423,15 +430,17 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
     const { recentTrackIds, trackStats } =
       await getRecentAndEverSeenWeeklyTrackIds(period, "latest");
     const previousWeekChart = await getPreviousWeekChartForRaw(period, "latest");
+    const chart = applyRawWeeklyHistory(
+      toChartFromRawWeekly(rawChart, period),
+      previousWeekChart,
+      trackStats,
+      recentTrackIds,
+    );
 
     return {
       kind: "found",
-      chart: applyRawWeeklyHistory(
-        toChartFromRawWeekly(rawChart, period),
-        previousWeekChart,
-        trackStats,
-        recentTrackIds,
-      ),
+      chart,
+      artistItems: buildArtistChartItems(chart.items),
       cachePolicy: getCachePolicy("latest"),
     } satisfies ChartFoundResult;
   } catch {
@@ -476,14 +485,16 @@ export const getWeeklyChart = async (
           period,
           lookupScope,
         );
+        const chart = applyRawWeeklyHistory(
+          toChartFromRawWeekly(rawChart, period),
+          previousWeekChart,
+          trackStats,
+          recentTrackIds,
+        );
         return {
           kind: "found",
-          chart: applyRawWeeklyHistory(
-            toChartFromRawWeekly(rawChart, period),
-            previousWeekChart,
-            trackStats,
-            recentTrackIds,
-          ),
+          chart,
+          artistItems: buildArtistChartItems(chart.items),
           cachePolicy: getCachePolicy(lookupScope),
         } satisfies ChartFoundResult;
       }
@@ -502,9 +513,16 @@ export const getWeeklyChart = async (
       };
     }
 
+    const artistItems = await getWeeklyArtistChartFromS3(
+      isoYear,
+      isoWeek,
+      lookupScope,
+    );
+
     return {
       kind: "found",
       chart,
+      artistItems: artistItems ?? undefined,
       cachePolicy: getCachePolicy(lookupScope),
     } satisfies ChartFoundResult;
   } catch {

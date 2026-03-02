@@ -143,7 +143,10 @@ export const ChartPageContent = ({
 
         {result.kind === "found" ? (
           activeScope === "weekly" ? (
-            <WeeklyChartSection items={result.chart.items} />
+            <WeeklyChartSection
+              items={result.chart.items}
+              artistItems={result.artistItems}
+            />
           ) : (
             <ChartList items={result.chart.items} chartType={activeScope} />
           )

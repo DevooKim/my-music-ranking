@@ -14,7 +14,11 @@ const withCacheMeta = <T extends object>(payload: T, cachePolicy: CacheMeta) => 
 
 export const toApiResponse = (result: ChartQueryResult): NextResponse => {
   if (result.kind === "found") {
-    return NextResponse.json(withCacheMeta(result.chart, result.cachePolicy), {
+    const payload = {
+      ...result.chart,
+      ...(result.artistItems ? { artistItems: result.artistItems } : {}),
+    };
+    return NextResponse.json(withCacheMeta(payload, result.cachePolicy), {
       status: 200,
       headers: {
         "Cache-Control": result.cachePolicy.cacheControl,
