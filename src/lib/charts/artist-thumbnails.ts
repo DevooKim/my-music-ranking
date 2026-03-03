@@ -254,14 +254,11 @@ const getAccessToken = async (): Promise<string> => {
     throw new Error("Spotify client credentials are not configured for artist thumbnail update.");
   }
 
-  const tokenParams = refreshToken
-    ? {
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-      }
-    : {
-        grant_type: "client_credentials",
-      };
+  const tokenParams = new URLSearchParams();
+  tokenParams.set("grant_type", refreshToken ? "refresh_token" : "client_credentials");
+  if (refreshToken) {
+    tokenParams.set("refresh_token", refreshToken);
+  }
 
   const response = await fetch(SPOTIFY_TOKEN_URL, {
     method: "POST",
@@ -269,7 +266,7 @@ const getAccessToken = async (): Promise<string> => {
       "Content-Type": "application/x-www-form-urlencoded",
       Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
     },
-    body: new URLSearchParams(tokenParams),
+    body: tokenParams,
   });
 
   if (!response.ok) {
