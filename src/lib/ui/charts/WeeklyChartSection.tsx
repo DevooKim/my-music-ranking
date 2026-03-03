@@ -113,14 +113,16 @@ const ArtistChartList = ({
                 <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1ed760] text-sm font-bold text-[#04100a]">
                   {artist.rank}
                 </span>
-                {artist.artistImageUrl ? (
-                  <img
-                    src={artist.artistImageUrl}
-                    alt={artist.artistName}
-                    className="h-10 w-10 shrink-0 rounded-full object-cover"
-                    loading="lazy"
-                  />
-                ) : null}
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white/10">
+                  {artist.artistImageUrl ? (
+                    <img
+                      src={artist.artistImageUrl}
+                      alt={artist.artistName}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : null}
+                </div>
                 <div className="min-w-0 flex-1">
                   <a
                     href={`https://open.spotify.com/artist/${artist.artistId}`}
