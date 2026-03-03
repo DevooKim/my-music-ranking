@@ -225,17 +225,16 @@ const readTrackStatsFromParquet = async (): Promise<WeeklyTrackStats | null> => 
     return null;
   }
 
-  const connection = await duckdbClient.getDuckDB();
-  const parquetUrl = buildPublicS3Url(chartS3Keys.trackStatsParquet());
-  const sql = `SELECT trackId, weeklyPeakRank, totalWeeksOnChart FROM read_parquet('${parquetUrl}')`;
   let rows: TrackStatsRow[];
   try {
+    const connection = await duckdbClient.getDuckDB();
+    const parquetUrl = buildPublicS3Url(chartS3Keys.trackStatsParquet());
+    const sql = `SELECT trackId, weeklyPeakRank, totalWeeksOnChart FROM read_parquet('${parquetUrl}')`;
     rows = await duckdbClient.queryAll<TrackStatsRow>(connection, sql);
   } catch (error) {
-    console.error("Failed to read track stats from parquet. Fallback to json.", error);
+    console.error("Failed to initialize DuckDB for track-stats parquet query.", error);
     return null;
   }
-
   if (!rows.length) return null;
 
   const normalized: WeeklyTrackStats = {};
@@ -356,45 +355,47 @@ const readWeeklyArtistChartByQuery = async (
     return null;
   }
 
-  const connection = await duckdbClient.getDuckDB();
-  const rawWeekUrl = buildPublicS3Url(chartS3Keys.rawWeek(isoYear, isoWeek));
-
-  const sql = `
-    WITH flattened AS (
-      SELECT unnest(items) AS item
-      FROM read_json_auto('${rawWeekUrl}', union_by_name=true)
-    ),
-    expanded AS (
-      SELECT
-        t.artistId,
-        list_extract(item.artistNames, t.idx) AS artistName,
-        NULL::VARCHAR AS artistImageUrl,
-        item.trackId AS trackId,
-        CAST(item.durationMs AS BIGINT) AS durationMs,
-        CAST(item.playedAt AS TIMESTAMP) AS playedAt
-      FROM flattened, unnest(item.artistIds) WITH ORDINALITY AS t(artistId, idx)
-    )
-    SELECT
-      artistId,
-      any_value(artistName) AS artistName,
-      max(nullif(artistImageUrl, '')) AS artistImageUrl,
-      count(*) AS playCount,
-      coalesce(sum(durationMs), 0) AS totalDurationMs,
-      count(distinct trackId) AS trackCount
-    FROM expanded
-    WHERE artistId IS NOT NULL
-      AND artistId <> ''
-      AND artistName IS NOT NULL
-      AND artistName <> ''
-    GROUP BY artistId
-    ORDER BY playCount DESC, trackCount ASC, totalDurationMs ASC, min(playedAt) ASC
-  `;
-
   let rows: ArtistChartRow[];
   try {
+    const connection = await duckdbClient.getDuckDB();
+    const rawWeekUrl = buildPublicS3Url(chartS3Keys.rawWeek(isoYear, isoWeek));
+
+    const sql = `
+      WITH flattened AS (
+        SELECT unnest(items) AS item
+        FROM read_json_auto('${rawWeekUrl}', union_by_name=true)
+      ),
+      expanded AS (
+        SELECT
+          t.artistId,
+          list_extract(item.artistNames, t.idx) AS artistName,
+          NULL::VARCHAR AS artistImageUrl,
+          item.trackId AS trackId,
+          CAST(item.durationMs AS BIGINT) AS durationMs,
+          CAST(item.playedAt AS TIMESTAMP) AS playedAt
+        FROM flattened, unnest(item.artistIds) WITH ORDINALITY AS t(artistId, idx)
+      )
+      SELECT
+        artistId,
+        any_value(artistName) AS artistName,
+        max(nullif(artistImageUrl, '')) AS artistImageUrl,
+        count(*) AS playCount,
+        coalesce(sum(durationMs), 0) AS totalDurationMs,
+        count(distinct trackId) AS trackCount
+      FROM expanded
+      WHERE artistId IS NOT NULL
+        AND artistId <> ''
+        AND artistName IS NOT NULL
+        AND artistName <> ''
+      GROUP BY artistId
+      ORDER BY playCount DESC, trackCount ASC, totalDurationMs ASC, min(playedAt) ASC
+    `;
     rows = await duckdbClient.queryAll<ArtistChartRow>(connection, sql);
   } catch (error) {
-    console.error("Failed to query weekly artist chart from raw data. Fallback to chart item aggregation.", error);
+    console.error(
+      "Failed to query weekly artist chart from raw data. Fallback to chart item aggregation.",
+      error,
+    );
     return null;
   }
 
