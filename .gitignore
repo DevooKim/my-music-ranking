@@ -41,7 +41,7 @@ yarn-error.log*
 .env*
 !.env.lambda.example
 !.env.example
-lambda/.env.lambda
+/lambda/.env.lambda
 
 # vercel
 .vercel
