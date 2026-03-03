@@ -366,13 +366,13 @@ const readWeeklyArtistChartByQuery = async (
     ),
     expanded AS (
       SELECT
-        list_extract(item.artistIds, idx) AS artistId,
-        list_extract(item.artistNames, idx) AS artistName,
-        list_extract(item.artistImageUrls, idx) AS artistImageUrl,
+        t.artistId,
+        list_extract(item.artistNames, t.idx) AS artistName,
+        NULL::VARCHAR AS artistImageUrl,
         item.trackId AS trackId,
         CAST(item.durationMs AS BIGINT) AS durationMs,
         CAST(item.playedAt AS TIMESTAMP) AS playedAt
-      FROM flattened, generate_subscripts(item.artistIds, 1) AS idx
+      FROM flattened, unnest(item.artistIds) WITH ORDINALITY AS t(artistId, idx)
     )
     SELECT
       artistId,
