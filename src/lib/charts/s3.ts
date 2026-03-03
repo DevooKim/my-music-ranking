@@ -43,6 +43,7 @@ export const chartS3Keys = {
 const isNotFoundError = (error: unknown): boolean => {
   const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
   return (
+    e?.name === "AccessDenied" ||
     e?.name === "NoSuchKey" ||
     e?.name === "NotFound" ||
     e?.$metadata?.httpStatusCode === 404
@@ -59,6 +60,9 @@ export const getJsonFromS3 = async <T>(key: string): Promise<T | null> => {
     });
 
     if (response.status === 404) {
+      return null;
+    }
+    if (response.status === 403) {
       return null;
     }
     if (!response.ok) {
