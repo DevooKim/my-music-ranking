@@ -7,16 +7,18 @@ export async function refreshAccessToken(): Promise<string> {
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET!;
   const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN!;
 
+  const tokenParams = {
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  } satisfies Record<string, string>;
+
   const response = await fetch(SPOTIFY_TOKEN_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
     },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }),
+    body: new URLSearchParams(tokenParams),
   });
 
   if (!response.ok) {
