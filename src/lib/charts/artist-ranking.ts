@@ -79,7 +79,7 @@ export const buildArtistChartItems = (items: ChartItem[]): ArtistChartItem[] => 
         return b[1].playCount - a[1].playCount;
       }
 
-      const trackCountDiff = b[1].trackIds.size - a[1].trackIds.size;
+      const trackCountDiff = a[1].trackIds.size - b[1].trackIds.size;
       if (trackCountDiff !== 0) {
         return trackCountDiff;
       }

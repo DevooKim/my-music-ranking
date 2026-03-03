@@ -387,7 +387,7 @@ const readWeeklyArtistChartByQuery = async (
       AND artistName IS NOT NULL
       AND artistName <> ''
     GROUP BY artistId
-    ORDER BY playCount DESC, trackCount DESC, totalDurationMs ASC, min(playedAt) ASC
+    ORDER BY playCount DESC, trackCount ASC, totalDurationMs ASC, min(playedAt) ASC
   `;
 
   let rows: ArtistChartRow[];
