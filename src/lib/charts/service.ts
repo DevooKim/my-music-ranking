@@ -425,11 +425,12 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
     }
 
     const chart = toChartFromRawWeekly(rawChart, period);
+    const artistItems = buildArtistChartItems(chart.items);
 
     return {
       kind: "found",
       chart,
-      artistItems: buildArtistChartItems(chart.items),
+      artistItems,
       cachePolicy: getCachePolicy("latest"),
     } satisfies ChartFoundResult;
   } catch {
@@ -476,10 +477,13 @@ export const getWeeklyChart = async (
           trackStats,
           recentTrackIds,
         );
+
+        const serverArtistItems = buildArtistChartItems(chart.items);
+
         return {
           kind: "found",
           chart,
-          artistItems: buildArtistChartItems(chart.items),
+          artistItems: serverArtistItems,
           cachePolicy: getCachePolicy(lookupScope),
         } satisfies ChartFoundResult;
       }
@@ -504,10 +508,12 @@ export const getWeeklyChart = async (
       lookupScope,
     );
 
+    const hydratedArtistItems = artistItems;
+
     return {
       kind: "found",
       chart,
-      artistItems: artistItems ?? undefined,
+      artistItems: hydratedArtistItems ?? undefined,
       cachePolicy: getCachePolicy(lookupScope),
     } satisfies ChartFoundResult;
   } catch {

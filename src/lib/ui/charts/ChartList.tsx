@@ -50,7 +50,7 @@ export const ChartList = ({ items, chartType }: Props) => {
       typeof document === "undefined" ? null : document.documentElement,
     estimateSize: () =>
       isMobile ? ITEM_HEIGHT_MOBILE + ITEM_GAP_MOBILE : ITEM_HEIGHT + ITEM_GAP,
-    overscan: 6,
+    overscan: 1,
   });
 
   const virtualItems = virtualizer.getVirtualItems();

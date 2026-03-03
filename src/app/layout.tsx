@@ -3,6 +3,7 @@ import { Manrope, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { ScrollToTopButton } from "@/lib/ui/common/ScrollToTopButton";
 import { ServiceWorkerRegister } from "@/lib/ui/common/ServiceWorkerRegister";
+import { QueryProvider } from "@/lib/ui/common/QueryProvider";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -19,7 +20,6 @@ export const metadata: Metadata = {
   description: "My Music Ranking - 주간/월간/연간 랭킹을 S3 처리본 기반으로 보여주는 앱",
   manifest: "/manifest.webmanifest",
   applicationName: "My Music Ranking",
-  themeColor: "#02060e",
   appleWebApp: {
     capable: true,
     title: "My Music Ranking",
@@ -50,7 +50,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/pwa-512.png" sizes="512x512" />
       </head>
       <body className={`${manrope.variable} ${notoSansKr.variable} antialiased`}>
-        {children}
+        <QueryProvider>{children}</QueryProvider>
         <Analytics />
         <SpeedInsights />
         <ScrollToTopButton />
