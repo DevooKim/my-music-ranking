@@ -15,7 +15,9 @@ const normalizeArtistIds = (artistIds: readonly string[]): string[] => [
   ),
 ];
 
-export const fetchArtistThumbnails = async (artistIds: readonly string[]): Promise<ArtistThumbnailApiItem[]> => {
+export const fetchArtistThumbnails = async (
+  artistIds: readonly string[],
+): Promise<ArtistThumbnailApiItem[]> => {
   const normalized = normalizeArtistIds(artistIds).sort((a, b) =>
     a.localeCompare(b),
   );
@@ -37,5 +39,4 @@ export const fetchArtistThumbnails = async (artistIds: readonly string[]): Promi
       artistId: item.artistId,
       thumbnailUrl: item.thumbnailUrl ?? null,
     }));
-}
-
+};

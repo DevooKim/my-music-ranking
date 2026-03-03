@@ -381,18 +381,17 @@ export const getArtistThumbnailLookup = async (
   options: { skipAutoRefresh?: boolean } = {},
 ): Promise<ArtistThumbnailLookup[]> => {
   try {
-    const uniqueCount = new Set(
-      artistIds.map((artistId) => normalizeArtistId(artistId)),
-    ).size;
     const cache = await getArtistThumbnailCacheMap(artistIds);
 
     const lookups: ArtistThumbnailLookup[] = [];
-    let hitCount = 0;
-    let staleCount = 0;
-
     const staleIds: string[] = [];
 
-    for (const artistId of artistIds) {
+    for (const rawArtistId of artistIds) {
+      const artistId = normalizeArtistId(rawArtistId);
+      if (!artistId) {
+        continue;
+      }
+
       const entry = cache.get(artistId) ?? null;
       const needsRefresh = isStaleRecord(entry);
       lookups.push({
@@ -403,8 +402,6 @@ export const getArtistThumbnailLookup = async (
       });
 
       if (needsRefresh && artistId) staleIds.push(artistId);
-      if (entry) hitCount += 1;
-      if (needsRefresh) staleCount += 1;
     }
 
     const shouldAutoRefresh =
