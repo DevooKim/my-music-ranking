@@ -1,3 +1,6 @@
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { unstable_cache, revalidateTag } from "next/cache";
+
 export const bucketName =
   process.env.S3_BUCKET_NAME ||
   process.env.AWS_BUCKET_NAME ||
@@ -5,6 +8,17 @@ export const bucketName =
   "my-music-ranking";
 const region =
   process.env.S3_REGION || "ap-northeast-2";
+const parseIntOrDefault = (value: string | undefined, fallback: number): number => {
+  const parsed = Number.parseInt(value || "", 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+const PRIVATE_ARTIST_S3_CACHE_TTL_SECONDS = parseIntOrDefault(
+  process.env.ARTIST_THUMBNAIL_S3_CACHE_TTL_SECONDS,
+  14 * 24 * 60 * 60,
+);
+const PRIVATE_S3_CACHE_TAG = "artist-thumbnail-private-s3";
+
+export const s3Client = new S3Client({ region });
 
 export const buildPublicS3Url = (key: string): string =>
   `https://s3.${region}.amazonaws.com/${bucketName}/${key
@@ -59,4 +73,54 @@ export const getJsonFromS3 = async <T>(key: string): Promise<T | null> => {
     if (isNotFoundError(error)) return null;
     throw error;
   }
+};
+
+const getJsonFromPrivateS3Raw = async <T>(
+  key: string,
+): Promise<T | null> => {
+  try {
+    const result = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+      }),
+    );
+
+    const rawText = await result.Body?.transformToString();
+    if (!rawText) return null;
+
+    return JSON.parse(rawText) as T;
+  } catch (error) {
+    if (isNotFoundError(error)) return null;
+    throw error;
+  }
+};
+
+const getJsonFromPrivateS3Cached = (key: string) =>
+  unstable_cache(
+    async () => getJsonFromPrivateS3Raw<unknown>(key),
+    ["private-s3-json", key],
+    {
+      revalidate: PRIVATE_ARTIST_S3_CACHE_TTL_SECONDS,
+      tags: [PRIVATE_S3_CACHE_TAG],
+    },
+  );
+
+export const getJsonFromPrivateS3 = async <T>(
+  key: string,
+): Promise<T | null> => {
+  const raw = await getJsonFromPrivateS3Cached(key)();
+  return raw as T | null;
+};
+
+export const putJsonToS3 = async (key: string, data: unknown): Promise<void> => {
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+      Body: JSON.stringify(data),
+      ContentType: "application/json",
+    }),
+  );
+  revalidateTag(PRIVATE_S3_CACHE_TAG);
 };

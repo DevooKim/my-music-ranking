@@ -424,14 +424,16 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
       });
     }
 
-    const chart = toChartFromRawWeekly(rawChart, period);
+      const chart = toChartFromRawWeekly(rawChart, period);
 
-    return {
-      kind: "found",
-      chart,
-      artistItems: buildArtistChartItems(chart.items),
-      cachePolicy: getCachePolicy("latest"),
-    } satisfies ChartFoundResult;
+      const artistItems = buildArtistChartItems(chart.items);
+
+      return {
+        kind: "found",
+        chart,
+        artistItems,
+        cachePolicy: getCachePolicy("latest"),
+      } satisfies ChartFoundResult;
   } catch {
     return buildError("weekly", "주간 차트 조회 중 오류가 발생했습니다.");
   }
@@ -476,15 +478,18 @@ export const getWeeklyChart = async (
           trackStats,
           recentTrackIds,
         );
+
+        const serverArtistItems = buildArtistChartItems(chart.items);
+
         return {
           kind: "found",
           chart,
-          artistItems: buildArtistChartItems(chart.items),
+          artistItems: serverArtistItems,
           cachePolicy: getCachePolicy(lookupScope),
         } satisfies ChartFoundResult;
       }
 
-      const notReadyPolicy: CachePolicyScope = lookupScope;
+    const notReadyPolicy: CachePolicyScope = lookupScope;
       return {
         ...buildNotReady({
           status: "not_ready",
@@ -504,10 +509,12 @@ export const getWeeklyChart = async (
       lookupScope,
     );
 
+    const hydratedArtistItems = artistItems;
+
     return {
       kind: "found",
       chart,
-      artistItems: artistItems ?? undefined,
+      artistItems: hydratedArtistItems ?? undefined,
       cachePolicy: getCachePolicy(lookupScope),
     } satisfies ChartFoundResult;
   } catch {
