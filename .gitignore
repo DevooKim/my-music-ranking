@@ -40,7 +40,6 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.lambda.example
-lambda/.env.lambda
 
 # vercel
 .vercel
