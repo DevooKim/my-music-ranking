@@ -122,5 +122,5 @@ export const putJsonToS3 = async (key: string, data: unknown): Promise<void> => 
       ContentType: "application/json",
     }),
   );
-  revalidateTag(PRIVATE_S3_CACHE_TAG);
+  revalidateTag(PRIVATE_S3_CACHE_TAG, "max");
 };
