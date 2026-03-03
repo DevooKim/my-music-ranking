@@ -153,6 +153,12 @@ const toSafeNumber = (value: unknown, fallback: number): number => {
   return fallback;
 };
 
+const isServer = typeof window === "undefined";
+const logServerError = (message: string, error?: unknown): void => {
+  if (!isServer) return;
+  console.error(message, error);
+};
+
 const parseTrackStatsPreference = (): TrackStatsFormat => {
   const raw = (process.env.TRACK_STATS_READ_PREFERENCE || "parquet").toLowerCase();
   return raw === "json" ? "json" : "parquet";
@@ -221,7 +227,7 @@ const readTrackStatsFromParquet = async (): Promise<WeeklyTrackStats | null> => 
   try {
     duckdbClient = await import("@/lib/duckdb/client");
   } catch (error) {
-    console.error("DuckDB is not available. Fallback to track-stats json.", error);
+    logServerError("DuckDB is not available. Fallback to track-stats json.", error);
     return null;
   }
 
@@ -232,7 +238,7 @@ const readTrackStatsFromParquet = async (): Promise<WeeklyTrackStats | null> => 
     const sql = `SELECT trackId, weeklyPeakRank, totalWeeksOnChart FROM read_parquet('${parquetUrl}')`;
     rows = await duckdbClient.queryAll<TrackStatsRow>(connection, sql);
   } catch (error) {
-    console.error("Failed to initialize DuckDB for track-stats parquet query.", error);
+    logServerError("Failed to initialize DuckDB for track-stats parquet query.", error);
     return null;
   }
   if (!rows.length) return null;
@@ -351,7 +357,10 @@ const readWeeklyArtistChartByQuery = async (
   try {
     duckdbClient = await import("@/lib/duckdb/client");
   } catch (error) {
-    console.error("DuckDB is not available. Fallback to chart item aggregation.", error);
+    logServerError(
+      "DuckDB is not available. Fallback to chart item aggregation.",
+      error,
+    );
     return null;
   }
 
@@ -392,7 +401,7 @@ const readWeeklyArtistChartByQuery = async (
     `;
     rows = await duckdbClient.queryAll<ArtistChartRow>(connection, sql);
   } catch (error) {
-    console.error(
+    logServerError(
       "Failed to query weekly artist chart from raw data. Fallback to chart item aggregation.",
       error,
     );

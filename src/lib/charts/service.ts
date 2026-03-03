@@ -31,6 +31,28 @@ import type {
 } from "@/lib/charts/types";
 import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
 
+const formatError = (error: unknown): string => {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+  return String(error);
+};
+
+const logServiceError = (
+  type: "weekly" | "monthly" | "yearly",
+  context: string,
+  error: unknown,
+  meta?: Record<string, unknown>,
+): void => {
+  console.error(
+    `[chart-service:${type}] ${context}`,
+    {
+      ...meta,
+      error: formatError(error),
+    },
+  );
+};
+
 type RawPlayedItem = RawPlayedDataLike["items"][number] & {
   trackName?: string;
   albumId?: string;
@@ -433,7 +455,11 @@ export const getLatestWeeklyChart = async (): Promise<ChartQueryResult> => {
       artistItems,
       cachePolicy: getCachePolicy("latest"),
     } satisfies ChartFoundResult;
-  } catch {
+  } catch (error) {
+    logServiceError("weekly", "getLatestWeeklyChart failed", error, {
+      period,
+      cacheScope: "latest",
+    });
     return buildError("weekly", "주간 차트 조회 중 오류가 발생했습니다.");
   }
 };
@@ -516,7 +542,13 @@ export const getWeeklyChart = async (
       artistItems: hydratedArtistItems ?? undefined,
       cachePolicy: getCachePolicy(lookupScope),
     } satisfies ChartFoundResult;
-  } catch {
+  } catch (error) {
+    logServiceError("weekly", "getWeeklyChart failed", error, {
+      isoYear,
+      isoWeek,
+      isFuture,
+      lookupScope,
+    });
     return buildError("weekly", "주간 차트 조회 중 오류가 발생했습니다.");
   }
 };
@@ -559,7 +591,13 @@ export const getMonthlyChart = async (
       chart,
       cachePolicy: getCachePolicy(lookupScope),
     } satisfies ChartFoundResult;
-  } catch {
+  } catch (error) {
+    logServiceError("monthly", "getMonthlyChart failed", error, {
+      year,
+      month,
+      isFuture,
+      lookupScope,
+    });
     return buildError("monthly", "월간 차트 조회 중 오류가 발생했습니다.");
   }
 };
@@ -601,7 +639,12 @@ export const getYearlyChart = async (
       chart,
       cachePolicy: getCachePolicy(lookupScope),
     } satisfies ChartFoundResult;
-  } catch {
+  } catch (error) {
+    logServiceError("yearly", "getYearlyChart failed", error, {
+      year,
+      isFuture,
+      lookupScope,
+    });
     return buildError("yearly", "연간 차트 조회 중 오류가 발생했습니다.");
   }
 };
