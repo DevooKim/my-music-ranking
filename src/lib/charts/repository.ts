@@ -40,6 +40,15 @@ type TrackStatsRow = {
   totalWeeksOnChart?: unknown;
 };
 
+type ArtistChartRow = {
+  artistId?: unknown;
+  artistName?: unknown;
+  artistImageUrl?: unknown;
+  playCount?: unknown;
+  totalDurationMs?: unknown;
+  trackCount?: unknown;
+};
+
 export interface WeeklyTrackStatsRecord {
   weeklyPeakRank: number;
   totalWeeksOnChart: number;
@@ -334,6 +343,74 @@ const cachedYearlyCharts: CacheScopeLookup = {
   latest_not_found: createCachedJsonLookup("latest_not_found", "chart:yearly"),
 };
 
+
+const readWeeklyArtistChartByQuery = async (
+  isoYear: number,
+  isoWeek: number,
+): Promise<ArtistChartItem[] | null> => {
+  let duckdbClient: typeof import("@/lib/duckdb/client");
+  try {
+    duckdbClient = await import("@/lib/duckdb/client");
+  } catch (error) {
+    console.error("DuckDB is not available. Fallback to chart item aggregation.", error);
+    return null;
+  }
+
+  const connection = await duckdbClient.getDuckDB();
+  const rawWeekUrl = buildPublicS3Url(chartS3Keys.rawWeek(isoYear, isoWeek));
+
+  const sql = `
+    WITH flattened AS (
+      SELECT unnest(items) AS item
+      FROM read_json_auto('${rawWeekUrl}', union_by_name=true)
+    ),
+    expanded AS (
+      SELECT
+        list_extract(item.artistIds, idx) AS artistId,
+        list_extract(item.artistNames, idx) AS artistName,
+        list_extract(item.artistImageUrls, idx) AS artistImageUrl,
+        item.trackId AS trackId,
+        CAST(item.durationMs AS BIGINT) AS durationMs,
+        CAST(item.playedAt AS TIMESTAMP) AS playedAt
+      FROM flattened, generate_subscripts(item.artistIds, 1) AS idx
+    )
+    SELECT
+      artistId,
+      any_value(artistName) AS artistName,
+      max(nullif(artistImageUrl, '')) AS artistImageUrl,
+      count(*) AS playCount,
+      coalesce(sum(durationMs), 0) AS totalDurationMs,
+      count(distinct trackId) AS trackCount
+    FROM expanded
+    WHERE artistId IS NOT NULL
+      AND artistId <> ''
+      AND artistName IS NOT NULL
+      AND artistName <> ''
+    GROUP BY artistId
+    ORDER BY playCount DESC, trackCount ASC, totalDurationMs ASC, min(playedAt) ASC
+  `;
+
+  let rows: ArtistChartRow[];
+  try {
+    rows = await duckdbClient.queryAll<ArtistChartRow>(connection, sql);
+  } catch (error) {
+    console.error("Failed to query weekly artist chart from raw data. Fallback to chart item aggregation.", error);
+    return null;
+  }
+
+  if (!rows.length) return null;
+
+  return rows.map((row, index) => ({
+    rank: index + 1,
+    artistId: toSafeString(row.artistId),
+    artistName: toSafeString(row.artistName),
+    playCount: toSafeNumber(row.playCount, 0),
+    totalDurationMs: toSafeNumber(row.totalDurationMs, 0),
+    trackCount: toSafeNumber(row.trackCount, 0),
+    artistImageUrl: toSafeString(row.artistImageUrl) || null,
+  }));
+};
+
 const createCachedWeeklyArtistLookup = (
   scope: CachePolicyScope,
 ): ((
@@ -345,6 +422,11 @@ const createCachedWeeklyArtistLookup = (
   return (isoYear: number, isoWeek: number): Promise<ArtistChartItem[] | null> =>
     unstable_cache(
       async (): Promise<ArtistChartItem[] | null> => {
+        const queriedArtistItems = await readWeeklyArtistChartByQuery(isoYear, isoWeek);
+        if (queriedArtistItems) {
+          return queriedArtistItems;
+        }
+
         const chart = await getWeeklyChartFromS3(isoYear, isoWeek, scope);
         if (!chart) return null;
         return buildArtistChartItems(chart.items);
