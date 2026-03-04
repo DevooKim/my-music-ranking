@@ -1,7 +1,11 @@
-import { getWeekPeriod, isWeekPeriodAfter, moveWeekPeriod } from "@/lib/charts/period";
+import { notFound } from "next/navigation";
+import {
+  getWeekPeriod,
+  isWeekPeriodAfter,
+  moveWeekPeriod,
+} from "@/lib/charts/period";
 import { getCurrentPeriods, getWeeklyChart } from "@/lib/charts/service";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
-import { notFound } from "next/navigation";
 
 const parseIntParam = (value: string): number => {
   const parsed = Number.parseInt(value, 10);
@@ -11,10 +15,16 @@ const parseIntParam = (value: string): number => {
 
 export default async function WeeklyDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ isoYear: string; isoWeek: string }>;
+  searchParams?: Promise<{ view?: string }>;
 }) {
-  const { isoYear, isoWeek } = await params;
+  const [{ isoYear, isoWeek }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams ?? Promise.resolve({ view: undefined as string | undefined }),
+  ]);
+  const weeklyViewMode = toWeeklyViewMode(resolvedSearchParams.view);
 
   const year = parseIntParam(isoYear);
   const week = parseIntParam(isoWeek);
@@ -30,7 +40,8 @@ export default async function WeeklyDetailPage({
   const next = moveWeekPeriod(period, 1);
   const isNextAfterCurrent = isWeekPeriodAfter(next, current.weekly);
   const isNextCurrent =
-    next.isoYear === current.weekly.isoYear && next.isoWeek === current.weekly.isoWeek;
+    next.isoYear === current.weekly.isoYear &&
+    next.isoWeek === current.weekly.isoWeek;
   const nextHref = isNextAfterCurrent
     ? undefined
     : isNextCurrent
@@ -48,6 +59,10 @@ export default async function WeeklyDetailPage({
       activeScope="weekly"
       previousHref={`/weekly/${previous.isoYear}/${String(previous.isoWeek).padStart(2, "0")}`}
       nextHref={nextHref}
+      weeklyViewMode={weeklyViewMode}
     />
   );
 }
+
+const toWeeklyViewMode = (value?: string): "track" | "artist" =>
+  value === "artist" ? "artist" : "track";
