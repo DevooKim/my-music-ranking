@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useQuery } from "@tanstack/react-query";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
 import { fetchArtistThumbnails } from "@/lib/charts/artist-thumbnail-query";
 import type { ArtistChartItem, ChartItem } from "@/lib/charts/types";
@@ -19,6 +20,7 @@ const ITEM_GAP = 10;
 type WeeklyChartSectionProps = {
   items: ChartItem[];
   artistItems?: ArtistChartItem[];
+  initialViewMode?: ViewMode;
 };
 
 type ViewMode = "track" | "artist";
@@ -39,24 +41,27 @@ const ArtistChartList = ({
   const rowHeight = isMobile ? ITEM_HEIGHT_MOBILE : ITEM_HEIGHT;
   const rowGap = isMobile ? ITEM_GAP_MOBILE : ITEM_GAP;
 
-  const syncVisibleIds = (virtualizer: ReturnType<typeof useWindowVirtualizer>) => {
-    if (!onVisibleArtistIdsChange) return;
-    const virtualItems = virtualizer.getVirtualItems();
-    if (virtualItems.length === 0) return;
+  const syncVisibleIds = useCallback(
+    (virtualizer: ReturnType<typeof useWindowVirtualizer>) => {
+      if (!onVisibleArtistIdsChange) return;
+      const virtualItems = virtualizer.getVirtualItems();
+      if (virtualItems.length === 0) return;
 
-    const visibleArtistIds = [
-      ...new Set(
-        virtualItems
-          .map((virtualRow) => items[virtualRow.index]?.artistId ?? "")
-          .filter((artistId) => artistId.length > 0),
-      ),
-    ];
-    const nextKey = visibleArtistIds.join("|");
-    if (nextKey === lastVisibleIdsRef.current) return;
-    lastVisibleIdsRef.current = nextKey;
+      const visibleArtistIds = [
+        ...new Set(
+          virtualItems
+            .map((virtualRow) => items[virtualRow.index]?.artistId ?? "")
+            .filter((artistId) => artistId.length > 0),
+        ),
+      ];
+      const nextKey = visibleArtistIds.join("|");
+      if (nextKey === lastVisibleIdsRef.current) return;
+      lastVisibleIdsRef.current = nextKey;
 
-    onVisibleArtistIdsChange(visibleArtistIds);
-  };
+      onVisibleArtistIdsChange(visibleArtistIds);
+    },
+    [items, onVisibleArtistIdsChange],
+  );
 
   const virtualizer = useWindowVirtualizer({
     count: items.length,
@@ -89,11 +94,17 @@ const ArtistChartList = ({
 
   useEffect(() => {
     syncVisibleIds(virtualizer);
-  }, [items, onVisibleArtistIdsChange, virtualizer]);
+  }, [virtualizer, syncVisibleIds]);
 
   return (
-    <section ref={listRef} className="rounded-2xl border border-white/10 bg-[#111827]/70 p-2 sm:p-3">
-      <ol className="relative w-full px-1" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+    <section
+      ref={listRef}
+      className="rounded-2xl border border-white/10 bg-[#111827]/70 p-2 sm:p-3"
+    >
+      <ol
+        className="relative w-full px-1"
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const artist = items[virtualRow.index];
           if (!artist) return null;
@@ -153,14 +164,19 @@ const ArtistChartList = ({
 export const WeeklyChartSection = ({
   items,
   artistItems: providedArtistItems,
+  initialViewMode = "track",
 }: WeeklyChartSectionProps) => {
   const initialArtistItems = useMemo(
     () => providedArtistItems ?? buildArtistChartItems(items),
     [providedArtistItems, items],
   );
-  const [artistItems, setArtistItems] = useState<ArtistChartItem[]>(initialArtistItems);
-  const [viewMode, setViewMode] = useState<ViewMode>("track");
+  const [artistItems, setArtistItems] =
+    useState<ArtistChartItem[]>(initialArtistItems);
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [visibleArtistIds, setVisibleArtistIds] = useState<string[]>([]);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const visibleArtistItemMap = useMemo(
     () =>
@@ -177,6 +193,24 @@ export const WeeklyChartSection = ({
     setVisibleArtistIds([]);
   }, [initialArtistItems]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (viewMode === "artist") {
+      params.set("view", "artist");
+    } else {
+      params.delete("view");
+    }
+
+    const currentQuery = searchParams.toString();
+    const nextQuery = params.toString();
+    if (currentQuery === nextQuery) return;
+
+    const nextUrl =
+      nextQuery.length > 0 ? `${pathname}?${nextQuery}` : pathname;
+    router.replace(nextUrl, { scroll: false });
+  }, [pathname, router, searchParams, viewMode]);
+
   const missingThumbnailArtistIds = useMemo(() => {
     if (viewMode !== "artist" || visibleArtistIds.length === 0) return [];
 
@@ -184,7 +218,10 @@ export const WeeklyChartSection = ({
       ...new Set(
         visibleArtistIds
           .map((artistId) => visibleArtistItemMap.get(artistId))
-          .filter((item): item is ArtistChartItem => item !== undefined && !item.artistImageUrl)
+          .filter(
+            (item): item is ArtistChartItem =>
+              item !== undefined && !item.artistImageUrl,
+          )
           .map((item) => item.artistId),
       ),
     ];
@@ -218,7 +255,8 @@ export const WeeklyChartSection = ({
 
       const next = previous.map((item) => {
         if (!item.artistImageUrl) {
-          const thumbnailUrl = item.artistId.length > 0 ? thumbnailMap.get(item.artistId) : null;
+          const thumbnailUrl =
+            item.artistId.length > 0 ? thumbnailMap.get(item.artistId) : null;
           if (thumbnailUrl) {
             changed = true;
             return {

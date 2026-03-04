@@ -1,8 +1,15 @@
-import { getCurrentPeriods, getLatestWeeklyChart } from "@/lib/charts/service";
 import { moveWeekPeriod } from "@/lib/charts/period";
+import { getCurrentPeriods, getLatestWeeklyChart } from "@/lib/charts/service";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ view?: string }>;
+}) {
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const weeklyViewMode = toWeeklyViewMode(resolvedSearchParams.view);
+
   const result = await getLatestWeeklyChart();
   const current = getCurrentPeriods();
 
@@ -16,6 +23,10 @@ export default async function HomePage() {
       periods={current}
       activeScope="weekly"
       previousHref={`/weekly/${previousWeek.isoYear}/${String(previousWeek.isoWeek).padStart(2, "0")}`}
+      weeklyViewMode={weeklyViewMode}
     />
   );
 }
+
+const toWeeklyViewMode = (value?: string): "track" | "artist" =>
+  value === "artist" ? "artist" : "track";

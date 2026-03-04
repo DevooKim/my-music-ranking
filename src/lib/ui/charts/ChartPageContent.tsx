@@ -1,11 +1,12 @@
 import Link from "next/link";
-import type { ChartQueryResult } from "@/lib/charts/types";
-import type { MonthPeriod, YearPeriod, WeekPeriod } from "@/lib/charts/period";
+import type { MonthPeriod, WeekPeriod, YearPeriod } from "@/lib/charts/period";
 import { moveMonthPeriod, moveYearPeriod } from "@/lib/charts/period";
+import type { ChartQueryResult } from "@/lib/charts/types";
 import { ChartList, DetailActionButton } from "@/lib/ui/charts/ChartList";
 import { WeeklyChartSection } from "@/lib/ui/charts/WeeklyChartSection";
 
 type ChartScope = "weekly" | "monthly" | "yearly";
+type WeeklyViewMode = "track" | "artist";
 
 type CurrentPeriods = {
   weekly: WeekPeriod;
@@ -22,6 +23,7 @@ type ChartPageContentProps = {
   periods: CurrentPeriods;
   activeScope: ChartScope;
   serverRenderedAt?: string;
+  weeklyViewMode?: WeeklyViewMode;
 };
 
 export const ChartPageContent = ({
@@ -33,6 +35,7 @@ export const ChartPageContent = ({
   periods,
   activeScope,
   serverRenderedAt,
+  weeklyViewMode = "track",
 }: ChartPageContentProps) => {
   const formatDuration = (milliseconds: number) => {
     const totalMinutes = Math.max(0, Math.floor(milliseconds / 60000));
@@ -61,6 +64,13 @@ export const ChartPageContent = ({
         ? `/monthly/${lastMonth.year}/${String(lastMonth.month).padStart(2, "0")}`
         : `/yearly/${lastYear.year}`;
 
+  const withWeeklyView = (href: string) =>
+    activeScope === "weekly" && weeklyViewMode === "artist"
+      ? href.includes("?")
+        ? `${href}&view=artist`
+        : `${href}?view=artist`
+      : href;
+
   const quickLabel =
     activeScope === "weekly"
       ? "이번 주차로 이동"
@@ -72,10 +82,7 @@ export const ChartPageContent = ({
     <>
       <header className="sticky top-0 z-10 border-b border-white/10 bg-[#0b1020]/80 backdrop-blur">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
-          <Link
-            href="/"
-            className="flex items-center gap-3"
-          >
+          <Link href="/" className="flex items-center gap-3">
             <img
               src="/logo.svg"
               alt="My Music Ranking logo"
@@ -99,7 +106,11 @@ export const ChartPageContent = ({
               월간
             </Link>
             <Link
-              href={activeScope === "yearly" ? `/yearly/${periods.yearly.year}` : `/yearly/${lastYear.year}`}
+              href={
+                activeScope === "yearly"
+                  ? `/yearly/${periods.yearly.year}`
+                  : `/yearly/${lastYear.year}`
+              }
               className={`rounded-full px-2.5 py-1.5 text-center ${activeScope === "yearly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"} sm:px-4`}
             >
               연간
@@ -122,19 +133,27 @@ export const ChartPageContent = ({
             <p className="text-sm text-[#b6c2d1]">{description}</p>
           )}
           {serverRenderedAt ? (
-            <p className="text-xs text-[#7c8694]">서버 렌더링 시각: {serverRenderedAt}</p>
+            <p className="text-xs text-[#7c8694]">
+              서버 렌더링 시각: {serverRenderedAt}
+            </p>
           ) : null}
         </header>
 
         <div className="flex flex-wrap gap-2">
           {previousHref ? (
-            <DetailActionButton href={previousHref} label="이전 구간" />
+            <DetailActionButton
+              href={withWeeklyView(previousHref)}
+              label="이전 구간"
+            />
           ) : null}
           {nextHref ? (
-            <DetailActionButton href={nextHref} label="다음 구간" />
+            <DetailActionButton
+              href={withWeeklyView(nextHref)}
+              label="다음 구간"
+            />
           ) : null}
           <Link
-            href={latestHref}
+            href={withWeeklyView(latestHref)}
             className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-[#121212] hover:bg-white"
           >
             {quickLabel}
@@ -146,6 +165,7 @@ export const ChartPageContent = ({
             <WeeklyChartSection
               items={result.chart.items}
               artistItems={result.artistItems}
+              initialViewMode={weeklyViewMode}
             />
           ) : (
             <ChartList items={result.chart.items} chartType={activeScope} />
