@@ -5,6 +5,10 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$SCRIPT_DIR"
+
 # Load environment variables from .env.lambda
 if [ ! -f ".env.lambda" ]; then
     echo "Error: .env.lambda file not found!"
@@ -12,8 +16,10 @@ if [ ! -f ".env.lambda" ]; then
     exit 1
 fi
 
-# Load environment variables
-export $(cat .env.lambda | grep -v '^#' | xargs)
+# Load environment variables without exposing them through command arguments.
+set -a
+. ./.env.lambda
+set +a
 
 # Validate required parameters
 if [ -z "$SPOTIFY_CLIENT_ID" ] || [ -z "$SPOTIFY_CLIENT_SECRET" ] || [ -z "$SPOTIFY_REFRESH_TOKEN" ]; then
@@ -25,15 +31,27 @@ echo "🚀 Starting SAM deployment..."
 echo "📍 Region: ${AWS_REGION:-ap-northeast-2}"
 echo "📦 S3 Bucket: ${S3_ARTIFACTS_BUCKET}"
 
-# Run SAM deploy
+# SAM's esbuild builder requires the project-local binary on PATH.
+export PATH="$PROJECT_DIR/node_modules/.bin:$PATH"
+if ! command -v esbuild >/dev/null 2>&1; then
+    echo "Error: esbuild not found. Run 'bun install' in the project root first."
+    exit 1
+fi
+
+echo "🔨 Building Lambda bundles..."
+sam build
+
+# Deploy only the built artifacts.
 if [ "$1" == "--guided" ]; then
-    sam deploy --guided --s3-bucket "$S3_ARTIFACTS_BUCKET" \
+    sam deploy --guided --template-file .aws-sam/build/template.yaml \
+        --s3-bucket "$S3_ARTIFACTS_BUCKET" \
         --parameter-overrides \
         "SpotifyClientId=$SPOTIFY_CLIENT_ID" \
         "SpotifyClientSecret=$SPOTIFY_CLIENT_SECRET" \
         "SpotifyRefreshToken=$SPOTIFY_REFRESH_TOKEN"
 else
-    sam deploy --s3-bucket "$S3_ARTIFACTS_BUCKET" \
+    sam deploy --template-file .aws-sam/build/template.yaml \
+        --s3-bucket "$S3_ARTIFACTS_BUCKET" \
         --parameter-overrides \
         "SpotifyClientId=$SPOTIFY_CLIENT_ID" \
         "SpotifyClientSecret=$SPOTIFY_CLIENT_SECRET" \
