@@ -129,6 +129,7 @@ const main = async (): Promise<void> => {
     redirect_uri: REDIRECT_URI,
     scope: "user-read-recently-played",
     state,
+    show_dialog: "true",
   }).toString();
 
   const callback = readCallback(state);
