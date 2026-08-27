@@ -2,17 +2,68 @@ const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 const SPOTIFY_API_URL = "https://api.spotify.com/v1";
 const DEFAULT_RECENTLY_PLAYED_URL = `${SPOTIFY_API_URL}/me/player/recently-played?limit=50`;
 
-export async function refreshAccessToken(): Promise<string> {
-  const clientId = process.env.SPOTIFY_CLIENT_ID!;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET!;
-  const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN!;
+type SpotifyTokenResponse = {
+  access_token?: unknown;
+  error?: unknown;
+  error_description?: unknown;
+};
+
+export class SpotifyTokenRefreshError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+  readonly requiresReauthorization: boolean;
+
+  constructor(status: number, code: string | null) {
+    const requiresReauthorization = code === "invalid_grant";
+    super(
+      requiresReauthorization
+        ? `Spotify reauthorization required (${code}; HTTP ${status})`
+        : `Token refresh failed: ${status}${code ? ` (${code})` : ""}`,
+    );
+    this.name = "SpotifyTokenRefreshError";
+    this.status = status;
+    this.code = code;
+    this.requiresReauthorization = requiresReauthorization;
+  }
+}
+
+const readTokenResponse = async (
+  response: Response,
+): Promise<SpotifyTokenResponse> => {
+  try {
+    return (await response.json()) as SpotifyTokenResponse;
+  } catch {
+    return {};
+  }
+};
+
+const toNonEmptyString = (value: unknown): string | null =>
+  typeof value === "string" && value.length > 0 ? value : null;
+
+interface RefreshAccessTokenOptions {
+  fetchImpl?: typeof fetch;
+  env?: Record<string, string | undefined>;
+}
+
+export async function refreshAccessToken(
+  options: RefreshAccessTokenOptions = {},
+): Promise<string> {
+  const env = options.env ?? process.env;
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const clientId = env.SPOTIFY_CLIENT_ID;
+  const clientSecret = env.SPOTIFY_CLIENT_SECRET;
+  const refreshToken = env.SPOTIFY_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error("Spotify credentials are not configured");
+  }
 
   const tokenParams = {
     grant_type: "refresh_token",
     refresh_token: refreshToken,
   } satisfies Record<string, string>;
 
-  const response = await fetch(SPOTIFY_TOKEN_URL, {
+  const response = await fetchImpl(SPOTIFY_TOKEN_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -21,12 +72,20 @@ export async function refreshAccessToken(): Promise<string> {
     body: new URLSearchParams(tokenParams),
   });
 
+  const data = await readTokenResponse(response);
   if (!response.ok) {
-    throw new Error(`Token refresh failed: ${response.status}`);
+    throw new SpotifyTokenRefreshError(
+      response.status,
+      toNonEmptyString(data.error),
+    );
   }
 
-  const data = await response.json();
-  return data.access_token;
+  const accessToken = toNonEmptyString(data.access_token);
+  if (!accessToken) {
+    throw new SpotifyTokenRefreshError(response.status, "invalid_response");
+  }
+
+  return accessToken;
 }
 
 // next URL 또는 기본 URL로 API 호출
@@ -101,7 +160,7 @@ export async function fetchRecentlyPlayed(
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'accept-language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        "accept-language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
       },
     },
   );
