@@ -7,7 +7,9 @@ import {
 
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 const SPOTIFY_API_URL = "https://api.spotify.com/v1";
-const ARTIST_BATCH_SIZE = 50;
+const ARTIST_REQUEST_CONCURRENCY = 5;
+const SPOTIFY_RATE_LIMIT_MAX_RETRIES = 2;
+const DEFAULT_RETRY_AFTER_SECONDS = 1;
 
 const parseIntOrDefault = (value: string | undefined, fallback: number): number => {
   const parsed = Number.parseInt(value || "", 10);
@@ -279,40 +281,96 @@ const getAccessToken = async (): Promise<string> => {
 
 const isValidAccessToken = (value: string): boolean => value.length > 0;
 
-const fetchArtistsFromSpotify = async (
-  accessToken: string,
-  ids: string[],
-): Promise<SpotifyArtist[]> => {
-  const url = `${SPOTIFY_API_URL}/artists?ids=${encodeURIComponent(ids.join(","))}`;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      accept: "application/json",
-    },
-  });
+const wait = async (milliseconds: number): Promise<void> => {
+  await new Promise((resolve) => setTimeout(resolve, milliseconds));
+};
 
-  if (!response.ok) {
-    throw new Error(`Spotify artist lookup failed: ${response.status}`);
+const retryAfterMilliseconds = (response: Response): number => {
+  const seconds = Number(response.headers.get("retry-after"));
+  return Number.isFinite(seconds) && seconds >= 0
+    ? seconds * 1000
+    : DEFAULT_RETRY_AFTER_SECONDS * 1000;
+};
+
+const fetchArtistFromSpotify = async (
+  accessToken: string,
+  artistId: string,
+): Promise<SpotifyArtist | null> => {
+  for (
+    let attempt = 0;
+    attempt <= SPOTIFY_RATE_LIMIT_MAX_RETRIES;
+    attempt += 1
+  ) {
+    const response = await fetch(
+      `${SPOTIFY_API_URL}/artists/${encodeURIComponent(artistId)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          accept: "application/json",
+        },
+      },
+    );
+
+    if (response.status === 429 && attempt < SPOTIFY_RATE_LIMIT_MAX_RETRIES) {
+      await wait(retryAfterMilliseconds(response));
+      continue;
+    }
+
+    if (response.status === 404) return null;
+
+    if (!response.ok) {
+      throw new Error(
+        `Spotify artist lookup failed for ${artistId}: ${response.status}`,
+      );
+    }
+
+    const payload = (await response.json()) as unknown;
+    if (!payload || typeof payload !== "object") {
+      throw new Error(
+        `Spotify artist lookup returned invalid data for ${artistId}`,
+      );
+    }
+
+    const candidate = payload as Record<string, unknown>;
+    const id = toSafeString(candidate.id);
+    if (!id) {
+      throw new Error(`Spotify artist lookup returned no id for ${artistId}`);
+    }
+
+    return {
+      id,
+      images: candidate.images,
+    };
   }
 
-  const payload = (await response.json()) as { artists?: unknown };
-  const artists = Array.isArray(payload.artists) ? payload.artists : [];
+  return null;
+};
 
-  return artists
-    .map((artist) => {
-      if (!artist || typeof artist !== "object") return null;
-      const candidate = artist as Record<string, unknown>;
-      const id = toSafeString(candidate.id);
-      if (!id) return null;
+export const fetchArtistsFromSpotify = async (
+  accessToken: string,
+  ids: readonly string[],
+): Promise<Map<string, SpotifyArtist | null>> => {
+  const byId = new Map<string, SpotifyArtist | null>();
 
-      return {
-        id,
-        images: candidate.images,
-      } as SpotifyArtist;
-    })
-    .filter((artist): artist is SpotifyArtist =>
-      artist !== null && typeof artist.id === "string",
+  for (const group of chunk([...ids], ARTIST_REQUEST_CONCURRENCY)) {
+    const results = await Promise.allSettled(
+      group.map((artistId) => fetchArtistFromSpotify(accessToken, artistId)),
     );
+
+    for (const [index, result] of results.entries()) {
+      const artistId = group[index];
+      if (result.status === "fulfilled") {
+        byId.set(artistId, result.value);
+      } else {
+        console.warn(
+          `Failed to refresh Spotify artist ${artistId}:`,
+          result.reason,
+        );
+      }
+    }
+  }
+
+  return byId;
 };
 
 const refreshArtistThumbnails = async (
@@ -328,31 +386,23 @@ const refreshArtistThumbnails = async (
   const accessToken = await getAccessToken();
   if (!isValidAccessToken(accessToken)) return;
 
-  const groups = chunk(deduped, ARTIST_BATCH_SIZE);
   const now = new Date().toISOString();
+  const byId = await fetchArtistsFromSpotify(accessToken, deduped);
 
-  for (const group of groups) {
-    const artists = await fetchArtistsFromSpotify(accessToken, group);
-    const byId = new Map(group.map((id) => [id, ""]));
-
-    for (const artist of artists) {
-      const id = normalizeArtistId(artist.id);
-      if (!id) continue;
-      const imageUrl = pickThumbnailUrl(toSafeImageList(artist.images));
-      byId.set(id, imageUrl || "");
-    }
-
-    await Promise.all(
-      group.map(async (artistId) => {
-        const thumbnailUrl = byId.get(artistId) || "";
-        await writeArtistThumbnail({
-          artistId,
-          thumbnailUrl: thumbnailUrl.length > 0 ? thumbnailUrl : null,
-          updatedAt: now,
-        });
-      }),
-    );
-  }
+  await Promise.all(
+    deduped.map(async (artistId) => {
+      if (!byId.has(artistId)) return;
+      const artist = byId.get(artistId);
+      const thumbnailUrl = artist
+        ? pickThumbnailUrl(toSafeImageList(artist.images))
+        : null;
+      await writeArtistThumbnail({
+        artistId,
+        thumbnailUrl,
+        updatedAt: now,
+      });
+    }),
+  );
 };
 
 export const getArtistThumbnailCacheMap = async (
