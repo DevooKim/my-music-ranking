@@ -5,11 +5,19 @@ import {
   moveWeekPeriod,
 } from "@/lib/charts/period";
 import { getCurrentPeriods, getWeeklyChart } from "@/lib/charts/service";
+import { parseBoundedDecimal } from "@/lib/routing/decimal";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
 
-const parseIntParam = (value: string): number => {
-  if (!/^\\d+$/.test(value)) notFound();
-  return Number(value);
+const parseYear = (value: string): number => {
+  const parsed = parseBoundedDecimal(value, 2000, 2500);
+  if (parsed === null) notFound();
+  return parsed;
+};
+
+const parseWeek = (value: string): number => {
+  const parsed = parseBoundedDecimal(value, 1, 53);
+  if (parsed === null) notFound();
+  return parsed;
 };
 
 export const dynamic = "force-dynamic";
@@ -29,12 +37,8 @@ export default async function WeeklyDetailPage({
   ]);
   const weeklyViewMode = toWeeklyViewMode(resolvedSearchParams.view);
 
-  const year = parseIntParam(isoYear);
-  const week = parseIntParam(isoWeek);
-
-  if (year < 2000 || week < 1 || week > 53) {
-    notFound();
-  }
+  const year = parseYear(isoYear);
+  const week = parseWeek(isoWeek);
 
   const period = getWeekPeriod(year, week);
   const current = getCurrentPeriods();

@@ -44,21 +44,44 @@ this repository workflow. Uptime Kuma remains loopback-only; if it needs to be
 operated remotely, use an authenticated tailnet path (SSH/tailnet access), not
 Funnel/public exposure.
 
-## Deploy / rollback
+## Versioned deploy / rollback
+
+Do not use `docker compose up --build` as a rollback mechanism. Build and record
+an immutable version identifier before replacing the running service. A local
+operator can use a commit-derived tag plus the image content ID; a registry
+operator should additionally record the registry digest and pin `WEB_IMAGE` to
+`name@sha256:...`.
 
 ```sh
-docker compose build web
-# review the image digest and then:
-docker compose up -d --no-build
+VERSION="$(git rev-parse --short=12 HEAD)"
+IMAGE="my-music-ranking:${VERSION}"
+docker build -t "$IMAGE" .
+IMAGE_ID="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
+printf 'WEB_IMAGE=%s\nIMAGE_ID=%s\n' "$IMAGE" "$IMAGE_ID" | tee "ops/deploy-${VERSION}.record"
+WEB_IMAGE="$IMAGE" docker compose up -d --no-build --force-recreate web nginx
 # verify health and logs without printing environment values
 docker compose ps
 docker compose logs --tail=100 web nginx
+curl -fsS http://127.0.0.1:8080/healthz
+./ops/clear-nginx-cache.sh
 ```
 
-A deployment must either run `ops/clear-nginx-cache.sh` after the new image is
-healthy or use a separately reviewed cache-generation rollover. This prevents
-old HTML/API entries from surviving an image change. The script only removes
-Nginx cache files, never Uptime Kuma data or secrets.
+Keep the deployment record and the previous image locally or in the approved
+registry. To roll back, set `WEB_IMAGE` to the recorded previous tag/digest,
+then recreate and health-check the same services:
+
+```sh
+WEB_IMAGE="my-music-ranking:${PREVIOUS_VERSION}" \
+  docker compose up -d --no-build --force-recreate web nginx
+curl -fsS http://127.0.0.1:8080/healthz
+docker compose ps
+./ops/clear-nginx-cache.sh
+```
+
+The cache clear (or an independently reviewed generation rollover) is mandatory
+after deploy and rollback so old HTML/API entries cannot survive an image
+change. The script only removes Nginx cache files, never Uptime Kuma data or
+secrets.
 
 ## Explicitly out of scope
 

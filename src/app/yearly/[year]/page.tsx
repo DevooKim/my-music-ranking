@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { getYearPeriod, moveYearPeriod } from "@/lib/charts/period";
 import { getCurrentPeriods, getYearlyChart } from "@/lib/charts/service";
+import { parseBoundedDecimal } from "@/lib/routing/decimal";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
 
-const parseIntParam = (value: string): number => {
-  if (!/^\\d+$/.test(value)) notFound();
-  return Number(value);
+const parseYear = (value: string): number => {
+  const parsed = parseBoundedDecimal(value, 2000, 2500);
+  if (parsed === null) notFound();
+  return parsed;
 };
 
 export const dynamic = "force-dynamic";
@@ -18,11 +20,7 @@ export default async function YearlyDetailPage({
   params: Promise<{ year: string }>;
 }) {
   const { year } = await params;
-  const parsedYear = parseIntParam(year);
-
-  if (parsedYear < 2000 || parsedYear > 2500) {
-    notFound();
-  }
+  const parsedYear = parseYear(year);
 
   const period = getYearPeriod(parsedYear);
   const current = getCurrentPeriods();

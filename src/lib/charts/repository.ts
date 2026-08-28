@@ -303,11 +303,22 @@ const createCachedJsonLookup = <T>(
 ): ((key: string) => Promise<T | null>) => {
   const policy = getCachePolicy(scope);
 
-  return (key: string): Promise<T | null> =>
-    unstable_cache(async () => getJsonFromS3<T>(key), [category, scope, key], {
-      revalidate: policy.maxAgeSeconds,
-      tags: lookupTags(category, key),
-    })();
+  return (key: string): Promise<T | null> => {
+    // Nginx is the only shared cache for latest data. Avoid a nested Next
+    // stale-while-revalidate layer that could extend the five-minute SLO.
+    if (scope === "latest" || scope === "latest_not_found") {
+      return getJsonFromS3<T>(key);
+    }
+
+    return unstable_cache(
+      async () => getJsonFromS3<T>(key),
+      [category, scope, key],
+      {
+        revalidate: policy.maxAgeSeconds,
+        tags: lookupTags(category, key),
+      },
+    )();
+  };
 };
 
 const createCachedTrackStatsLookup = (

@@ -45,7 +45,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!tags) return json({ error: "Invalid revalidation payload" }, 400);
 
   try {
-    for (const tag of tags) revalidateTag(tag, "max");
+    for (const tag of tags) revalidateTag(tag, { expire: 0 });
   } catch (error) {
     console.error("[revalidate] tag invalidation failed", error);
     return json({ error: "Revalidation failed" }, 500);

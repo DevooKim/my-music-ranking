@@ -134,5 +134,5 @@ export const putJsonToS3 = async (
       ContentType: "application/json",
     }),
   );
-  revalidateTag(PRIVATE_S3_CACHE_TAG, "max");
+  revalidateTag(PRIVATE_S3_CACHE_TAG, { expire: 0 });
 };

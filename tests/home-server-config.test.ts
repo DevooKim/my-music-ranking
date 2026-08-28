@@ -8,7 +8,10 @@ describe("home-server deployment configuration", () => {
     const dockerfile = read("Dockerfile");
     expect(dockerfile).toContain("node:22-bookworm-slim");
     expect(read("next.config.ts")).toContain('output: "standalone"');
-    expect(dockerfile).toContain("USER nextjs");
+    expect(dockerfile).toContain("USER root");
+    expect(dockerfile).toContain(
+      "gosu nextjs node scripts/duckdb-httpfs-smoke.cjs",
+    );
     expect(dockerfile).toContain("duckdb-httpfs-smoke.cjs");
   });
 
@@ -22,6 +25,17 @@ describe("home-server deployment configuration", () => {
     expect(nginx).toContain("/api/artist-thumbnails");
     expect(nginx).toContain("$http_cookie");
     expect(nginx).toContain("$http_upgrade");
+    expect(nginx).toContain("proxy_ignore_headers Cache-Control Expires;");
+    expect(nginx).toContain("location = / {");
+    expect(nginx).toContain("location ~ ^/(weekly|monthly|yearly)");
+  });
+
+  test("uses immediate Next invalidation without a nested latest cache", () => {
+    expect(read("src/app/api/revalidate/route.ts")).toContain("{ expire: 0 }");
+    expect(read("src/lib/charts/s3.ts")).toContain("{ expire: 0 }");
+    expect(read("src/lib/charts/repository.ts")).toContain(
+      'scope === "latest"',
+    );
   });
 
   test("keeps operational services off the public bind address", () => {

@@ -8,15 +8,21 @@
   at a safe 5-minute TTL; missing chart responses are 404 with a 2-minute
   negative-cache policy and no stale-while-revalidate directive.
 - `/_next/static/*`: 365 days and immutable.
-- `/sw.js`, health, revalidation, RSC/prefetch, cookies/auth, unsafe methods,
-  and artist-thumbnail requests bypass and are not stored.
+- Allowlisted HTML locations (`/` and chart detail paths) may replace Next's
+  dynamic `private/no-store` metadata with a public 5-minute policy; this is
+  scoped to those locations only. `/sw.js`, health, revalidation, RSC/prefetch,
+  cookies/auth, unsafe methods, Set-Cookie responses, and artist-thumbnail
+  requests bypass and are not stored. 4xx/5xx responses are not stored except
+  the deliberate 404 negative-cache policy.
 - `X-Cache-Status` and the Nginx cache access log are diagnostic only.
 
-The latest policy is also used by Next's `unstable_cache` lookups. Lambda writes
-invalidate matching Next tags and retries the HTTP notification at most three
-times with bounded timeout/backoff. A failed notification is logged as a
-structured warning; it does not claim that invalidation succeeded, and the
-5-minute latest TTL remains the fallback.
+Latest raw-week lookup intentionally bypasses Next's `unstable_cache`; Nginx is
+its only shared response cache, so an origin refresh cannot be extended by a
+second stale-while-revalidate layer. Historical lookups use Next's tag cache.
+Lambda writes invalidate matching Next tags immediately (`expire: 0`) and retry
+the HTTP notification at most three times with bounded timeout/backoff. A failed
+notification is logged as a structured warning; it does not claim that
+invalidation succeeded, and the 5-minute latest TTL remains the fallback.
 
 OSS Nginx has no general per-entry maximum stale-age switch. `proxy_cache_use_stale`
 is intentionally bounded operationally by the cache volume's `inactive=30d` and
@@ -29,13 +35,25 @@ is still subject to OSS Nginx stale semantics, so clear the cache when a strict
 
 ## Verification
 
-From a host with the service running:
+From a host with the service running (or run the synthetic standalone/Nginx
+matrix after building `WEB_IMAGE`):
+
+```sh
+WEB_IMAGE=my-music-ranking:reviewed ./tests/home-server-integration.sh
+```
+
+The integration script creates temporary synthetic secret files with mode 0400,
+starts Compose, checks the app process UID, and proves normal MISS→HIT after
+RSC-first and cookie-first requests. It removes its containers, volume, and
+synthetic files on exit. For manual checks:
 
 ```sh
 curl -i http://127.0.0.1:8080/
 curl -i http://127.0.0.1:8080/                 # should become HIT after warm-up
 curl -i -X POST http://127.0.0.1:8080/api/revalidate
 curl -i -H 'RSC: 1' http://127.0.0.1:8080/
+curl -i -H 'Cookie: session=test' http://127.0.0.1:8080/
+curl -i http://127.0.0.1:8080/                 # normal request can MISS then HIT
 curl -i http://127.0.0.1:8080/api/health/live
 ```
 

@@ -59,4 +59,5 @@ data/spotify-raw/*
 
 # local operational state
 /ops/.env
+/ops/deploy-*.record
 /.pi/

@@ -33,6 +33,7 @@ Vercel에서 제공하던 웹 실행 환경과 공유 캐시를 개인 홈서버
 - Docker 로그 rotation
 - Spotify February 2026 API 대응 확인
 - 캐시, 재검증, 장애 및 재부팅 복구 검증
+- standalone + Nginx 정상 MISS→HIT 및 RSC/cookie-first cache matrix 검증
 
 ### 제외
 
@@ -149,7 +150,9 @@ standalone 결과물과 정적 자산을 production image에 포함한다.
 - Debian 계열 이미지 사용
 - Alpine/musl은 사용하지 않음
 - `duckdb` native binary가 대상 CPU와 libc에서 로드되는지 빌드 및 실행 단계에서 확인
-- 컨테이너은 non-root 사용자로 실행
+- root의 최소 entrypoint만 host-owned `0400` Compose secret을 읽는다.
+- entrypoint가 `gosu`로 Node를 UID 1001 non-root 사용자에 drop하고 `exec`한다.
+- 최종 Node 프로세스 UID와 DuckDB/httpfs를 이미지/통합 smoke에서 검증한다.
 - Next 포트는 Docker 내부 네트워크에만 노출
 
 ### 6.3 Next 캐시
@@ -210,7 +213,7 @@ uptime_data     Uptime Kuma 설정 및 이력
 - Compose `secrets`를 통해 `/run/secrets/*`에 read-only mount
 - 로그와 health response에 secret 값을 출력하지 않음
 
-현재 애플리케이션과 AWS SDK는 일반 환경변수를 읽으므로 secret file을 mount하는 것만으로는 충분하지 않다. Next 컨테이너 entrypoint가 시작 전에 다음 값을 `/run/secrets/*`에서 읽어 export하도록 구성한다.
+현재 애플리케이션과 AWS SDK는 일반 환경변수를 읽으므로 secret file을 mount하는 것만으로는 충분하지 않다. root 권한의 최소 Next 컨테이너 entrypoint가 시작 전에 다음 값을 `/run/secrets/*`에서 읽어 export한 뒤 `gosu nextjs`로 Node를 UID 1001에 drop하도록 구성한다.
 
 ```text
 AWS_ACCESS_KEY_ID
@@ -320,15 +323,16 @@ X-Cache-Status: HIT | MISS | STALE | BYPASS | EXPIRED
 - `Set-Cookie`가 있는 응답은 캐시하지 않는다.
 - `private` 또는 `no-store` 응답을 강제로 캐시하지 않는다.
 - 일반 HTML을 캐시하기 위해 upstream `Cache-Control`을 무조건 무시하는 전역 설정은 금지한다.
-- 필요한 경우 대상 chart HTML route에만 애플리케이션 또는 제한된 Nginx 정책을 적용한다.
+- Next dynamic HTML의 `private/no-store`는 allowlisted `/` 및 chart detail HTML location에서만 제한적으로 무시하고, 같은 skip predicate, Set-Cookie, 4xx/5xx 보호를 유지한다.
 - `Vary` 및 content encoding을 cache key에서 안전하게 처리한다.
 
 ## 11. 캐시 무효화
 
 ### 11.1 최신 데이터
 
-- Lambda의 `/api/revalidate` 호출은 Next 내부 cache tag를 즉시 무효화한다.
+- Lambda의 `/api/revalidate` 호출은 Next 내부 cache tag를 `expire: 0`으로 즉시 무효화한다.
 - Nginx 최신 응답 캐시는 자동 purge하지 않는다.
+- latest raw 조회는 Next `unstable_cache`를 사용하지 않고 Nginx만 사용한다. 따라서 latest에서 stale background update가 별도 계층으로 SLO를 재연장하지 않는다.
 - Nginx TTL을 5분으로 제한하여 최악의 경우에도 5분 이내 새 응답을 조회한다.
 
 ### 11.2 과거 데이터 재집계
