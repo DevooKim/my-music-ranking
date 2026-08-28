@@ -25,6 +25,14 @@ describe("home-server deployment configuration", () => {
     expect(nginx).toContain("/api/artist-thumbnails");
     expect(nginx).toContain("$http_cookie");
     expect(nginx).toContain("$http_upgrade");
+    expect(nginx).toContain(
+      'map "$cache_skip:$skip_set_cookie:$skip_status:$html_upstream_status" $html_cache_control',
+    );
+    expect(nginx).toContain("map $upstream_status $html_upstream_status");
+    expect(nginx).toContain('"0:0:0:200" "public, max-age=0, s-maxage=300"');
+    expect(nginx).toContain('"0:0:0:404" "public, max-age=0, s-maxage=120"');
+    expect(nginx).toContain("~^0:1: BYPASS;");
+    expect(nginx).toContain("~^0:0:1: BYPASS;");
     expect(nginx).toContain("proxy_ignore_headers Cache-Control Expires;");
     expect(nginx).toContain("location = / {");
     expect(nginx).toContain("location ~ ^/(weekly|monthly|yearly)");
@@ -43,5 +51,25 @@ describe("home-server deployment configuration", () => {
     expect(compose).toContain('"127.0.0.1:8080:80"');
     expect(compose).toContain('"127.0.0.1:3001:3001"');
     expect(compose).not.toContain('"3000:3000"');
+  });
+
+  test("rollback helper verifies the recorded immutable image", () => {
+    const helper = read("ops/rollback-home-server.sh");
+    expect(helper).toContain("IMAGE_ID");
+    expect(helper).toContain("docker image inspect");
+    expect(helper).toContain("IMAGE_ID mismatch");
+    expect(helper).toContain("--force-recreate");
+    expect(helper).toContain("clear-nginx-cache.sh");
+  });
+
+  test("integration matrix covers every downstream cache guard", () => {
+    const integration = read("tests/home-server-integration.sh");
+    expect(integration).toContain("RSC: 1");
+    expect(integration).toContain("Authorization: Bearer integration");
+    expect(integration).toContain("-X POST");
+    expect(integration).toContain("Set-Cookie");
+    expect(integration).toContain("cache-test-client-error");
+    expect(integration).toContain("cache-test-server-error");
+    expect(integration).toContain("Cache-Control");
   });
 });

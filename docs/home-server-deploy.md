@@ -47,18 +47,21 @@ Funnel/public exposure.
 ## Versioned deploy / rollback
 
 Do not use `docker compose up --build` as a rollback mechanism. Build and record
-an immutable version identifier before replacing the running service. A local
-operator can use a commit-derived tag plus the image content ID; a registry
-operator should additionally record the registry digest and pin `WEB_IMAGE` to
-`name@sha256:...`.
+an immutable version identifier before replacing the running service. The record
+contains the image content ID, so a local tag is accepted only while its current
+ID exactly matches the recorded ID.
 
 ```sh
 VERSION="$(git rev-parse --short=12 HEAD)"
 IMAGE="my-music-ranking:${VERSION}"
 docker build -t "$IMAGE" .
 IMAGE_ID="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
-printf 'WEB_IMAGE=%s\nIMAGE_ID=%s\n' "$IMAGE" "$IMAGE_ID" | tee "ops/deploy-${VERSION}.record"
-WEB_IMAGE="$IMAGE" docker compose up -d --no-build --force-recreate web nginx
+IMAGE_DIGEST="$(docker image inspect "$IMAGE" \
+  --format '{{range .RepoDigests}}{{println .}}{{end}}' | sed -n '1p')"
+printf 'WEB_IMAGE=%s\nIMAGE_ID=%s\nIMAGE_DIGEST=%s\n' \
+  "$IMAGE" "$IMAGE_ID" "$IMAGE_DIGEST" | tee "ops/deploy-${VERSION}.record"
+export WEB_IMAGE="$IMAGE"
+docker compose up -d --no-build --force-recreate web nginx
 # verify health and logs without printing environment values
 docker compose ps
 docker compose logs --tail=100 web nginx
@@ -66,17 +69,43 @@ curl -fsS http://127.0.0.1:8080/healthz
 ./ops/clear-nginx-cache.sh
 ```
 
-Keep the deployment record and the previous image locally or in the approved
-registry. To roll back, set `WEB_IMAGE` to the recorded previous tag/digest,
-then recreate and health-check the same services:
+For a registry deployment, push the versioned tag first, obtain its registry
+digest, and record/deploy the digest reference—not the mutable tag:
 
 ```sh
-WEB_IMAGE="my-music-ranking:${PREVIOUS_VERSION}" \
-  docker compose up -d --no-build --force-recreate web nginx
+REGISTRY_TAG="registry.example/my-music-ranking:${VERSION}"
+docker tag "$IMAGE" "$REGISTRY_TAG"
+docker push "$REGISTRY_TAG"
+REGISTRY_REF="$(docker image inspect "$REGISTRY_TAG" \
+  --format '{{range .RepoDigests}}{{println .}}{{end}}' | sed -n '1p')"
+REGISTRY_REPOSITORY="${REGISTRY_TAG%:*}"
+case "$REGISTRY_REF" in
+  "$REGISTRY_REPOSITORY@sha256:"*) ;;
+  *) echo "registry digest was not returned" >&2; exit 1 ;;
+esac
+IMAGE_ID="$(docker image inspect "$REGISTRY_REF" --format '{{.Id}}')"
+printf 'WEB_IMAGE=%s\nIMAGE_ID=%s\nIMAGE_DIGEST=%s\n' \
+  "$REGISTRY_REF" "$IMAGE_ID" "$REGISTRY_REF" | tee "ops/deploy-${VERSION}.record"
+export WEB_IMAGE="$REGISTRY_REF"
+docker compose up -d --no-build --force-recreate web nginx
 curl -fsS http://127.0.0.1:8080/healthz
-docker compose ps
 ./ops/clear-nginx-cache.sh
 ```
+
+Keep the deployment record and the previous local image or registry digest in
+the approved store. Never hand-edit a record. Roll back with the executable
+helper; it refuses a missing image or any local tag/digest whose content ID
+differs from the recorded `IMAGE_ID`, then recreates, health-checks, and clears
+only the Nginx cache:
+
+```sh
+./ops/rollback-home-server.sh ops/deploy-${PREVIOUS_VERSION}.record
+```
+
+For a local record this check prevents a retagged mutable name from being used.
+For a registry record `WEB_IMAGE` must already be `name@sha256:...`, and the
+helper additionally requires that exact RepoDigest to be present locally. A
+failed ID/digest check stops before Compose is invoked.
 
 The cache clear (or an independently reviewed generation rollover) is mandatory
 after deploy and rollback so old HTML/API entries cannot survive an image
