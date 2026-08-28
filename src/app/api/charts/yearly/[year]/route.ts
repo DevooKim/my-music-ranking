@@ -1,8 +1,10 @@
+import { getCachePolicy } from "@/lib/charts/cache-policy";
 import { toApiResponse } from "@/lib/charts/http";
-import { getYearlyChart } from "@/lib/charts/service";
 import { getCurrentYearPeriod, isYearPeriodAfter } from "@/lib/charts/period";
+import { getYearlyChart } from "@/lib/charts/service";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const parseIntParam = (value: string): number => {
   const parsed = Number.parseInt(value, 10);
@@ -23,7 +25,10 @@ export async function GET(
         JSON.stringify({ error: "유효하지 않은 연도입니다." }),
         {
           status: 400,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+          },
         },
       );
     }
@@ -34,7 +39,10 @@ export async function GET(
         JSON.stringify({ error: "요청한 연도는 아직 집계되지 않았습니다." }),
         {
           status: 404,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": getCachePolicy("not_found").cacheControl,
+          },
         },
       );
     }
@@ -46,7 +54,10 @@ export async function GET(
       JSON.stringify({ error: "유효하지 않은 연도입니다." }),
       {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
       },
     );
   }

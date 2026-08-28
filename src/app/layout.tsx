@@ -4,8 +4,6 @@ import "./globals.css";
 import { ScrollToTopButton } from "@/lib/ui/common/ScrollToTopButton";
 import { ServiceWorkerRegister } from "@/lib/ui/common/ServiceWorkerRegister";
 import { QueryProvider } from "@/lib/ui/common/QueryProvider";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const manrope = Manrope({
   variable: "--font-geist-sans",
@@ -51,8 +49,6 @@ export default function RootLayout({
       </head>
       <body className={`${manrope.variable} ${notoSansKr.variable} antialiased`}>
         <QueryProvider>{children}</QueryProvider>
-        <Analytics />
-        <SpeedInsights />
         <ScrollToTopButton />
         <ServiceWorkerRegister />
       </body>

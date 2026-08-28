@@ -17,6 +17,8 @@ Globals:
         TRACK_STATS_READ_PREFERENCE: parquet
         DISCORD_NOTIFICATION_ENABLED: "false"
         DISCORD_WEBHOOK_URL: ""
+        REVALIDATE_ENDPOINT_URL: !Ref RevalidateEndpointUrl
+        REVALIDATE_SECRET: !Ref RevalidateSecret
 
 Parameters:
   S3BucketName:
@@ -31,6 +33,13 @@ Parameters:
     NoEcho: true
   SpotifyRefreshToken:
     Type: String
+    NoEcho: true
+  RevalidateEndpointUrl:
+    Type: String
+    Default: ""
+  RevalidateSecret:
+    Type: String
+    Default: ""
     NoEcho: true
 
 Resources:

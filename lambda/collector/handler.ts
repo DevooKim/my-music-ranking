@@ -1,17 +1,28 @@
-import { refreshAccessToken, fetchRecentlyPlayedByUrl, buildAfterUrl } from "../shared/spotify";
 import {
-  mapSpotifyToPlayedItem,
   deduplicatePlayedItems,
   groupByWeek,
+  mapSpotifyToPlayedItem,
 } from "../shared/mapper";
-import { s3Paths, getS3Json, putS3Json } from "../shared/s3";
-import type { RawPlayedData, PlayedItem, NextMetadata } from "../shared/types";
+import {
+  buildRawWeeklyRevalidationPayloads,
+  dispatchRevalidationRequests,
+  revalidateChartCache,
+} from "../shared/revalidate";
+import { getS3Json, putS3Json, s3Paths } from "../shared/s3";
+import {
+  buildAfterUrl,
+  fetchRecentlyPlayedByUrl,
+  refreshAccessToken,
+} from "../shared/spotify";
+import type { NextMetadata, PlayedItem, RawPlayedData } from "../shared/types";
 
 export const handler = async (): Promise<void> => {
   // API 요청 전 현재 시간 기록 (items가 없을 경우 after URL 생성에 사용)
   const requestTimestamp = Date.now();
 
-  console.log(`Collector started at ${new Date(requestTimestamp).toISOString()}`);
+  console.log(
+    `Collector started at ${new Date(requestTimestamp).toISOString()}`,
+  );
 
   try {
     // 1. 메타데이터에서 next URL 읽기
@@ -26,7 +37,9 @@ export const handler = async (): Promise<void> => {
     // 3. Spotify API 호출
     const spotifyData = await fetchRecentlyPlayedByUrl(accessToken, nextUrl);
 
-    console.log(`API response: ${spotifyData.items.length} items, next: ${spotifyData.next || "null"}`);
+    console.log(
+      `API response: ${spotifyData.items.length} items, next: ${spotifyData.next || "null"}`,
+    );
 
     // 4. 응답 처리
     if (spotifyData.items.length === 0) {
@@ -47,7 +60,9 @@ export const handler = async (): Promise<void> => {
     // 6. items를 재생 시각(played_at) 기준으로 주차별 그룹핑 (KST 기준)
     const weekGroups = groupByWeek(items);
 
-    console.log(`Grouped into ${weekGroups.length} week(s): ${weekGroups.map((g) => `${g.isoYear}-W${g.isoWeek}(${g.items.length})`).join(", ")}`);
+    console.log(
+      `Grouped into ${weekGroups.length} week(s): ${weekGroups.map((g) => `${g.isoYear}-W${g.isoWeek}(${g.items.length})`).join(", ")}`,
+    );
 
     // 7. 각 주차별로 처리
     for (const group of weekGroups) {
@@ -64,7 +79,8 @@ export const handler = async (): Promise<void> => {
 
       // 시간순 정렬
       dedupedItems.sort(
-        (a, b) => new Date(a.playedAt).getTime() - new Date(b.playedAt).getTime()
+        (a, b) =>
+          new Date(a.playedAt).getTime() - new Date(b.playedAt).getTime(),
       );
 
       // c. raw 파일 저장
@@ -75,7 +91,19 @@ export const handler = async (): Promise<void> => {
       };
 
       await putS3Json(rawKey, rawData);
-      console.log(`Saved ${dedupedItems.length} items to ${rawKey} (added ${dedupedItems.length - existingItems.length} new)`);
+      const revalidationResults = await dispatchRevalidationRequests(
+        buildRawWeeklyRevalidationPayloads(isoYear, isoWeek),
+        revalidateChartCache,
+      );
+      if (revalidationResults.some((result) => result && !result.ok)) {
+        console.warn(
+          "[collector] one or more cache revalidation requests failed",
+          { isoYear, isoWeek },
+        );
+      }
+      console.log(
+        `Saved ${dedupedItems.length} items to ${rawKey} (added ${dedupedItems.length - existingItems.length} new)`,
+      );
     }
 
     // 8. next 메타데이터 업데이트

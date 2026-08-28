@@ -8,10 +8,13 @@ import { getCurrentPeriods, getWeeklyChart } from "@/lib/charts/service";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
 
 const parseIntParam = (value: string): number => {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed)) throw new Error("invalid");
-  return parsed;
+  if (!/^\\d+$/.test(value)) notFound();
+  return Number(value);
 };
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
 
 export default async function WeeklyDetailPage({
   params,
@@ -49,6 +52,8 @@ export default async function WeeklyDetailPage({
       : `/weekly/${next.isoYear}/${String(next.isoWeek).padStart(2, "0")}`;
 
   const result = await getWeeklyChart(year, week);
+  if (result.kind === "not_found") notFound();
+  if (result.kind === "error") throw new Error(result.message);
 
   return (
     <ChartPageContent

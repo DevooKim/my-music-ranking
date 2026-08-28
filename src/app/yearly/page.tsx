@@ -8,9 +8,14 @@ const formatYearRange = (latestYear: number): number[] => {
   return Array.from({ length: size }, (_, index) => latestYear - index);
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
+
 export default async function YearlyPage() {
   const current = getCurrentPeriods();
   const latestResult = await getYearlyChart(current.yearly.year);
+  if (latestResult.kind === "error") throw new Error(latestResult.message);
   const years = formatYearRange(current.yearly.year);
 
   return (
@@ -23,7 +28,8 @@ export default async function YearlyPage() {
           연간 데이터
         </h1>
         <p className="max-w-2xl text-sm text-[#b6c2d1]">
-          년도별로 연간 집계 랭킹을 조회하고 원하는 구간으로 바로 이동할 수 있습니다.
+          년도별로 연간 집계 랭킹을 조회하고 원하는 구간으로 바로 이동할 수
+          있습니다.
         </p>
         <div className="flex flex-wrap gap-2">
           <Link
@@ -53,10 +59,12 @@ export default async function YearlyPage() {
             최신 연간 집계
           </p>
           <p className="mt-2 text-lg font-semibold text-white">
-            {current.yearly.year} · 총 {latestResult.chart.items.length.toLocaleString("ko-KR")}곡
+            {current.yearly.year} · 총{" "}
+            {latestResult.chart.items.length.toLocaleString("ko-KR")}곡
           </p>
           <p className="mt-1 text-sm text-[#8ea2b5]">
-            기간: {latestResult.chart.period.start} ~ {latestResult.chart.period.end}
+            기간: {latestResult.chart.period.start} ~{" "}
+            {latestResult.chart.period.end}
           </p>
         </section>
       ) : null}

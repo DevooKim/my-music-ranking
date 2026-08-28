@@ -26,6 +26,10 @@ if [ -z "$SPOTIFY_CLIENT_ID" ] || [ -z "$SPOTIFY_CLIENT_SECRET" ] || [ -z "$SPOT
     echo "Error: Required Spotify credentials are missing in .env.lambda"
     exit 1
 fi
+if [ -n "$REVALIDATE_ENDPOINT_URL" ] && [ -z "$REVALIDATE_SECRET" ]; then
+    echo "Error: REVALIDATE_SECRET is required when REVALIDATE_ENDPOINT_URL is set"
+    exit 1
+fi
 
 echo "🚀 Starting SAM deployment..."
 echo "📍 Region: ${AWS_REGION:-ap-northeast-2}"
@@ -48,14 +52,18 @@ if [ "$1" == "--guided" ]; then
         --parameter-overrides \
         "SpotifyClientId=$SPOTIFY_CLIENT_ID" \
         "SpotifyClientSecret=$SPOTIFY_CLIENT_SECRET" \
-        "SpotifyRefreshToken=$SPOTIFY_REFRESH_TOKEN"
+        "SpotifyRefreshToken=$SPOTIFY_REFRESH_TOKEN" \
+        "RevalidateEndpointUrl=${REVALIDATE_ENDPOINT_URL:-}" \
+        "RevalidateSecret=${REVALIDATE_SECRET:-}"
 else
     sam deploy --template-file .aws-sam/build/template.yaml \
         --s3-bucket "$S3_ARTIFACTS_BUCKET" \
         --parameter-overrides \
         "SpotifyClientId=$SPOTIFY_CLIENT_ID" \
         "SpotifyClientSecret=$SPOTIFY_CLIENT_SECRET" \
-        "SpotifyRefreshToken=$SPOTIFY_REFRESH_TOKEN"
+        "SpotifyRefreshToken=$SPOTIFY_REFRESH_TOKEN" \
+        "RevalidateEndpointUrl=${REVALIDATE_ENDPOINT_URL:-}" \
+        "RevalidateSecret=${REVALIDATE_SECRET:-}"
 fi
 
 echo "✅ Deployment completed!"

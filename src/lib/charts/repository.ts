@@ -1,8 +1,7 @@
 import { unstable_cache } from "next/cache";
-
+import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
 import { getCachePolicy } from "@/lib/charts/cache-policy";
 import { buildPublicS3Url, chartS3Keys, getJsonFromS3 } from "@/lib/charts/s3";
-import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
 import type {
   ArtistChartItem,
   CachePolicyScope,
@@ -61,13 +60,6 @@ interface CacheScopeLookup {
   not_found: (key: string) => Promise<unknown | null>;
   latest: (key: string) => Promise<unknown | null>;
   latest_not_found: (key: string) => Promise<unknown | null>;
-}
-
-interface TrackStatsScopeLookup {
-  found: () => Promise<WeeklyTrackStats | null>;
-  not_found: () => Promise<WeeklyTrackStats | null>;
-  latest: () => Promise<WeeklyTrackStats | null>;
-  latest_not_found: () => Promise<WeeklyTrackStats | null>;
 }
 
 interface ArtistChartScopeLookup {
@@ -160,7 +152,9 @@ const logServerError = (message: string, error?: unknown): void => {
 };
 
 const parseTrackStatsPreference = (): TrackStatsFormat => {
-  const raw = (process.env.TRACK_STATS_READ_PREFERENCE || "parquet").toLowerCase();
+  const raw = (
+    process.env.TRACK_STATS_READ_PREFERENCE || "parquet"
+  ).toLowerCase();
   return raw === "json" ? "json" : "parquet";
 };
 
@@ -184,7 +178,10 @@ const normalizeTrackStatsRow = (
   };
 
   return {
-    weeklyPeakRank: toSafeNumber(source.weeklyPeakRank, Number.MAX_SAFE_INTEGER),
+    weeklyPeakRank: toSafeNumber(
+      source.weeklyPeakRank,
+      Number.MAX_SAFE_INTEGER,
+    ),
     totalWeeksOnChart: toSafeNumber(source.totalWeeksOnChart, 0),
   };
 };
@@ -222,41 +219,50 @@ const readTrackStatsFromJson = async (): Promise<WeeklyTrackStats | null> => {
   return normalizeTrackStats(raw);
 };
 
-const readTrackStatsFromParquet = async (): Promise<WeeklyTrackStats | null> => {
-  let duckdbClient: typeof import("@/lib/duckdb/client");
-  try {
-    duckdbClient = await import("@/lib/duckdb/client");
-  } catch (error) {
-    logServerError("DuckDB is not available. Fallback to track-stats json.", error);
-    return null;
-  }
+const readTrackStatsFromParquet =
+  async (): Promise<WeeklyTrackStats | null> => {
+    let duckdbClient: typeof import("@/lib/duckdb/client");
+    try {
+      duckdbClient = await import("@/lib/duckdb/client");
+    } catch (error) {
+      logServerError(
+        "DuckDB is not available. Fallback to track-stats json.",
+        error,
+      );
+      return null;
+    }
 
-  let rows: TrackStatsRow[];
-  try {
-    const connection = await duckdbClient.getDuckDB();
-    const parquetUrl = buildPublicS3Url(chartS3Keys.trackStatsParquet());
-    const sql = `SELECT trackId, weeklyPeakRank, totalWeeksOnChart FROM read_parquet('${parquetUrl}')`;
-    rows = await duckdbClient.queryAll<TrackStatsRow>(connection, sql);
-  } catch (error) {
-    logServerError("Failed to initialize DuckDB for track-stats parquet query.", error);
-    return null;
-  }
-  if (!rows.length) return null;
+    let rows: TrackStatsRow[];
+    try {
+      const connection = await duckdbClient.getDuckDB();
+      const parquetUrl = buildPublicS3Url(chartS3Keys.trackStatsParquet());
+      const sql = `SELECT trackId, weeklyPeakRank, totalWeeksOnChart FROM read_parquet('${parquetUrl}')`;
+      rows = await duckdbClient.queryAll<TrackStatsRow>(connection, sql);
+    } catch (error) {
+      logServerError(
+        "Failed to initialize DuckDB for track-stats parquet query.",
+        error,
+      );
+      return null;
+    }
+    if (!rows.length) return null;
 
-  const normalized: WeeklyTrackStats = {};
-  for (const row of rows) {
-    const stats = normalizeTrackStatsFromParquetRow(row);
-    if (!stats) continue;
-    const trackId = toSafeString(row.trackId);
-    if (!trackId) continue;
-    normalized[trackId] = stats;
-  }
+    const normalized: WeeklyTrackStats = {};
+    for (const row of rows) {
+      const stats = normalizeTrackStatsFromParquetRow(row);
+      if (!stats) continue;
+      const trackId = toSafeString(row.trackId);
+      if (!trackId) continue;
+      normalized[trackId] = stats;
+    }
 
-  return normalized;
-};
+    return normalized;
+  };
 
 const toStringArray = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((x): x is string => typeof x === "string" && x.length > 0) : [];
+  Array.isArray(value)
+    ? value.filter((x): x is string => typeof x === "string" && x.length > 0)
+    : [];
 
 const normalizeChartResponse = (value: ChartResponse): ChartResponse => ({
   ...value,
@@ -268,6 +274,29 @@ const normalizeChartResponse = (value: ChartResponse): ChartResponse => ({
   })),
 });
 
+const lookupTags = (category: string, key: string): string[] => {
+  const weekly = key.match(
+    /(?:raw\/|processed\/weekly\/)(\d{4}).*?(?:raw-week|weekly-week)-(\d{2})\.json$/,
+  );
+  if (weekly) {
+    return ["chart", category, `chart:weekly:${weekly[1]}:${weekly[2]}`];
+  }
+
+  const monthly = key.match(
+    /processed\/monthly\/(\d{4})\/monthly-month-(\d{2})\.json$/,
+  );
+  if (monthly) {
+    return ["chart", category, `chart:monthly:${monthly[1]}:${monthly[2]}`];
+  }
+
+  const yearly = key.match(/processed\/yearly\/yearly-(\d{4})\.json$/);
+  if (yearly) {
+    return ["chart", category, `chart:yearly:${yearly[1]}`];
+  }
+
+  return ["chart", category];
+};
+
 const createCachedJsonLookup = <T>(
   scope: CachePolicyScope,
   category: string,
@@ -275,13 +304,10 @@ const createCachedJsonLookup = <T>(
   const policy = getCachePolicy(scope);
 
   return (key: string): Promise<T | null> =>
-    unstable_cache(
-      async () => getJsonFromS3<T>(key),
-      [category, scope, key],
-      {
-        revalidate: policy.maxAgeSeconds,
-      },
-    )();
+    unstable_cache(async () => getJsonFromS3<T>(key), [category, scope, key], {
+      revalidate: policy.maxAgeSeconds,
+      tags: lookupTags(category, key),
+    })();
 };
 
 const createCachedTrackStatsLookup = (
@@ -301,11 +327,15 @@ const createCachedTrackStatsLookup = (
     [cacheKey, scope],
     {
       revalidate: policy.maxAgeSeconds,
+      tags: ["chart", "chart:track-stats"],
     },
   );
 };
 
-const cachedTrackStats: Record<TrackStatsFormat, Record<CachePolicyScope, () => Promise<WeeklyTrackStats | null>>> = {
+const cachedTrackStats: Record<
+  TrackStatsFormat,
+  Record<CachePolicyScope, () => Promise<WeeklyTrackStats | null>>
+> = {
   json: {
     found: createCachedTrackStatsLookup("found", "json"),
     not_found: createCachedTrackStatsLookup("not_found", "json"),
@@ -316,7 +346,10 @@ const cachedTrackStats: Record<TrackStatsFormat, Record<CachePolicyScope, () => 
     found: createCachedTrackStatsLookup("found", "parquet"),
     not_found: createCachedTrackStatsLookup("not_found", "parquet"),
     latest: createCachedTrackStatsLookup("latest", "parquet"),
-    latest_not_found: createCachedTrackStatsLookup("latest_not_found", "parquet"),
+    latest_not_found: createCachedTrackStatsLookup(
+      "latest_not_found",
+      "parquet",
+    ),
   },
 };
 
@@ -331,7 +364,10 @@ const cachedRawWeeklies: CacheScopeLookup = {
   found: createCachedJsonLookup("found", "chart:raw-weekly"),
   not_found: createCachedJsonLookup("not_found", "chart:raw-weekly"),
   latest: createCachedJsonLookup("latest", "chart:raw-weekly"),
-  latest_not_found: createCachedJsonLookup("latest_not_found", "chart:raw-weekly"),
+  latest_not_found: createCachedJsonLookup(
+    "latest_not_found",
+    "chart:raw-weekly",
+  ),
 };
 
 const cachedMonthlyCharts: CacheScopeLookup = {
@@ -347,7 +383,6 @@ const cachedYearlyCharts: CacheScopeLookup = {
   latest: createCachedJsonLookup("latest", "chart:yearly"),
   latest_not_found: createCachedJsonLookup("latest_not_found", "chart:yearly"),
 };
-
 
 const readWeeklyArtistChartByQuery = async (
   isoYear: number,
@@ -429,10 +464,16 @@ const createCachedWeeklyArtistLookup = (
 ) => Promise<ArtistChartItem[] | null>) => {
   const policy = getCachePolicy(scope);
 
-  return (isoYear: number, isoWeek: number): Promise<ArtistChartItem[] | null> =>
+  return (
+    isoYear: number,
+    isoWeek: number,
+  ): Promise<ArtistChartItem[] | null> =>
     unstable_cache(
       async (): Promise<ArtistChartItem[] | null> => {
-        const queriedArtistItems = await readWeeklyArtistChartByQuery(isoYear, isoWeek);
+        const queriedArtistItems = await readWeeklyArtistChartByQuery(
+          isoYear,
+          isoWeek,
+        );
         if (queriedArtistItems) {
           return queriedArtistItems;
         }
@@ -444,16 +485,19 @@ const createCachedWeeklyArtistLookup = (
       ["chart:artist-weekly", scope, String(isoYear), String(isoWeek)],
       {
         revalidate: policy.maxAgeSeconds,
+        tags: [
+          "chart",
+          "chart:artist-weekly",
+          `chart:weekly:${isoYear}:${String(isoWeek).padStart(2, "0")}`,
+          `chart:artist-weekly:${isoYear}:${String(isoWeek).padStart(2, "0")}`,
+        ],
       },
     )();
 };
 
 const createCachedWeeklyArtistLookups = (): Record<
   CachePolicyScope,
-  (
-    isoYear: number,
-    isoWeek: number,
-  ) => Promise<ArtistChartItem[] | null>
+  (isoYear: number, isoWeek: number) => Promise<ArtistChartItem[] | null>
 > => ({
   found: createCachedWeeklyArtistLookup("found"),
   not_found: createCachedWeeklyArtistLookup("not_found"),

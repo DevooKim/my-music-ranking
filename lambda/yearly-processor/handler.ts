@@ -1,21 +1,32 @@
-import { eachWeekOfInterval, endOfYear, getISOWeek, getISOWeekYear, startOfYear } from "date-fns";
 import { TZDate } from "@date-fns/tz";
+import {
+  eachWeekOfInterval,
+  endOfYear,
+  getISOWeek,
+  getISOWeekYear,
+  startOfYear,
+} from "date-fns";
 import { buildChart } from "../shared/chart";
-import { s3Paths, getS3Json, putS3Json } from "../shared/s3";
-import type {
-  ChartResponse,
-  RawPlayedData,
-  TrackStats,
-} from "../shared/types";
+import {
+  buildTrackStatsNotificationPayload,
+  sendDiscordNotification,
+} from "../shared/discord-notify";
+import {
+  buildTrackStatsRevalidationPayloads,
+  revalidateChartCache,
+} from "../shared/revalidate";
+import { getS3Json, putS3Json, s3Paths } from "../shared/s3";
 import { getTrackStats, putTrackStats } from "../shared/track-stats-storage";
-import { buildTrackStatsNotificationPayload, sendDiscordNotification } from "../shared/discord-notify";
+import type { ChartResponse, RawPlayedData, TrackStats } from "../shared/types";
 
 const KOREA_TIMEZONE = "Asia/Seoul";
 type LambdaContextLike = { memoryLimitInMB?: number | string };
 
 function getLambdaRuntime(startMs: number, context?: LambdaContextLike) {
   const memory = process.memoryUsage();
-  const memoryLimitMB = context?.memoryLimitInMB ? Number(context.memoryLimitInMB) : undefined;
+  const memoryLimitMB = context?.memoryLimitInMB
+    ? Number(context.memoryLimitInMB)
+    : undefined;
 
   return {
     executionMs: Date.now() - startMs,
@@ -33,7 +44,9 @@ function getDiscordWebhook(): string | undefined {
   return process.env.DISCORD_WEBHOOK_URL;
 }
 
-async function notifyDiscord(context: Parameters<typeof buildTrackStatsNotificationPayload>[0]): Promise<void> {
+async function notifyDiscord(
+  context: Parameters<typeof buildTrackStatsNotificationPayload>[0],
+): Promise<void> {
   if (!isDiscordEnabled()) return;
   await sendDiscordNotification(context, getDiscordWebhook());
 }
@@ -42,12 +55,24 @@ function toKstDate(isoString: string): TZDate {
   return new TZDate(isoString, KOREA_TIMEZONE);
 }
 
-export const handler = async (_event: unknown, context?: LambdaContextLike): Promise<void> => {
+export const handler = async (
+  _event: unknown,
+  context?: LambdaContextLike,
+): Promise<void> => {
   const totalStart = Date.now();
   const now = new TZDate(new Date(), KOREA_TIMEZONE);
 
   // 지난 해 정보
-  const lastYear = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds()));
+  const lastYear = new Date(
+    Date.UTC(
+      now.getUTCFullYear() - 1,
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      now.getUTCHours(),
+      now.getUTCMinutes(),
+      now.getUTCSeconds(),
+    ),
+  );
   const year = lastYear.getFullYear();
   const startDate = startOfYear(lastYear);
   const endDate = endOfYear(lastYear);
@@ -64,13 +89,16 @@ export const handler = async (_event: unknown, context?: LambdaContextLike): Pro
       { weekStartsOn: 1 },
     );
 
-    const allItems: (RawPlayedData["items"][number] & { playedAt: string })[] = [];
+    const allItems: (RawPlayedData["items"][number] & { playedAt: string })[] =
+      [];
     const rawReadStart = Date.now();
     for (const weekStart of weeks) {
       const isoYear = getISOWeekYear(weekStart);
       const isoWeek = getISOWeek(weekStart);
 
-      const rawData = await getS3Json<RawPlayedData>(s3Paths.raw(isoYear, isoWeek));
+      const rawData = await getS3Json<RawPlayedData>(
+        s3Paths.raw(isoYear, isoWeek),
+      );
       if (!rawData?.items?.length) continue;
 
       const filtered = rawData.items.filter((item) => {
@@ -137,10 +165,18 @@ export const handler = async (_event: unknown, context?: LambdaContextLike): Pro
     };
 
     await putS3Json(s3Paths.yearlyProcessed(year), chartWithoutEntryStatus);
-    console.log(`Saved yearly chart: ${chartWithoutEntryStatus.items.length} items`);
+    await revalidateChartCache({ kind: "chart", chartType: "yearly", year });
+    console.log(
+      `Saved yearly chart: ${chartWithoutEntryStatus.items.length} items`,
+    );
 
     const writeStart = Date.now();
     const trackStatsWrite = await putTrackStats(updatedStats);
+    for (const payload of buildTrackStatsRevalidationPayloads(
+      trackStatsWrite.partialFailure,
+    )) {
+      await revalidateChartCache(payload);
+    }
     const writeDuration = Date.now() - writeStart;
     const status = trackStatsWrite.partialFailure ? "partial" : "success";
     const eventLabel = trackStatsWrite.partialFailure
