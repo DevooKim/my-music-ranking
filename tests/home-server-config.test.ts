@@ -70,6 +70,6 @@ describe("home-server deployment configuration", () => {
     expect(integration).toContain("Set-Cookie");
     expect(integration).toContain("cache-test-client-error");
     expect(integration).toContain("cache-test-server-error");
-    expect(integration).toContain("Cache-Control");
+    expect(integration).toContain("cache-control:");
   });
 });
