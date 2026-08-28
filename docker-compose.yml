@@ -1,0 +1,91 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      S3_BUCKET: ${S3_BUCKET:-my-music-ranking}
+      S3_REGION: ${S3_REGION:-ap-northeast-2}
+      CHART_TIME_ZONE: ${CHART_TIME_ZONE:-Asia/Seoul}
+      TRACK_STATS_READ_PREFERENCE: ${TRACK_STATS_READ_PREFERENCE:-parquet}
+      SPOTIFY_RAW_COLLECTION_INTERVAL_SECONDS: ${SPOTIFY_RAW_COLLECTION_INTERVAL_SECONDS:-1800}
+      CHART_LATEST_CACHE_MAX_AGE_SECONDS: ${CHART_LATEST_CACHE_MAX_AGE_SECONDS:-300}
+      CHART_LATEST_CACHE_SWR_SECONDS: ${CHART_LATEST_CACHE_SWR_SECONDS:-300}
+      CHART_LATEST_NOT_FOUND_CACHE_MAX_AGE_SECONDS: ${CHART_LATEST_NOT_FOUND_CACHE_MAX_AGE_SECONDS:-120}
+      CHART_LATEST_NOT_FOUND_CACHE_SWR_SECONDS: "0"
+    secrets:
+      - aws_access_key_id
+      - aws_secret_access_key
+      - spotify_client_id
+      - spotify_client_secret
+      - spotify_refresh_token
+      - revalidate_secret
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      web:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - nginx_cache:/var/cache/nginx
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/healthz >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  uptime:
+    image: louislam/uptime-kuma:1
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - uptime_data:/app/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  nginx_cache:
+  uptime_data:
+
+secrets:
+  aws_access_key_id:
+    file: ${AWS_ACCESS_KEY_ID_FILE:-.secrets/aws_access_key_id.example}
+  aws_secret_access_key:
+    file: ${AWS_SECRET_ACCESS_KEY_FILE:-.secrets/aws_secret_access_key.example}
+  spotify_client_id:
+    file: ${SPOTIFY_CLIENT_ID_FILE:-.secrets/spotify_client_id.example}
+  spotify_client_secret:
+    file: ${SPOTIFY_CLIENT_SECRET_FILE:-.secrets/spotify_client_secret.example}
+  spotify_refresh_token:
+    file: ${SPOTIFY_REFRESH_TOKEN_FILE:-.secrets/spotify_refresh_token.example}
+  revalidate_secret:
+    file: ${REVALIDATE_SECRET_FILE:-.secrets/revalidate_secret.example}

@@ -43,6 +43,10 @@ yarn-error.log*
 !.env.example
 /lambda/.env.lambda
 
+# local Docker Compose secrets (only the non-secret examples are committed)
+/.secrets/*
+!/.secrets/*.example
+
 # vercel
 .vercel
 
@@ -52,3 +56,7 @@ next-env.d.ts
 
 data/spotify-raw/*
 /.cache/artist-thumbnails
+
+# local operational state
+/ops/.env
+/.pi/
