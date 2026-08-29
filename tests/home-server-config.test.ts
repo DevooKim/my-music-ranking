@@ -15,6 +15,15 @@ describe("home-server deployment configuration", () => {
     expect(dockerfile).toContain("duckdb-httpfs-smoke.cjs");
   });
 
+  test("pins the Bun 1.4 and TypeScript 7 toolchain", () => {
+    const packageJson = JSON.parse(read("package.json"));
+    const dockerfile = read("Dockerfile");
+
+    expect(packageJson.packageManager).toBe("bun@1.4.0");
+    expect(packageJson.devDependencies.typescript).toStartWith("^7.");
+    expect(dockerfile).toContain("bun@1.4.0");
+  });
+
   test("applies the identical cache skip variable to bypass and no-cache", () => {
     const nginx = read("docker/nginx/nginx.conf");
     expect(nginx).toContain("proxy_cache_bypass $cache_skip;");

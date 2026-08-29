@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.0.0",
-    "@date-fns/tz": "^1.2.0",
-    "date-fns": "^4.1.0"
+    "@aws-sdk/client-s3": "^3.1121.0",
+    "@date-fns/tz": "^1.5.0",
+    "date-fns": "^4.4.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "esbuild": "^0.24.2",
-    "typescript": "^5.0.0"
+    "@types/node": "^22.20.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
   }
 }

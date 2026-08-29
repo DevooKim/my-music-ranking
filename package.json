@@ -2,37 +2,43 @@
   "name": "my-music-ranking",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.4.0",
+  "engines": {
+    "bun": ">=1.4.0"
+  },
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "test": "bun test",
     "test:watch": "bun test --watch",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check",
     "format": "biome format --write"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.995.0",
-    "@tanstack/react-query": "^5.90.21",
-    "@tanstack/react-virtual": "^3.13.18",
-    "date-fns": "^4.1.0",
+    "@aws-sdk/client-s3": "^3.1121.0",
+    "@tanstack/react-query": "^5.102.8",
+    "@tanstack/react-virtual": "^3.14.10",
+    "date-fns": "^4.4.0",
     "duckdb": "^1.4.4",
-    "iconv-lite": "^0.7.2",
-    "next": "16.1.6",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "zod": "^4.3.6"
+    "iconv-lite": "^0.7.3",
+    "next": "16.3.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "^4.5.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.4",
-    "@tailwindcss/postcss": "^4.2.1",
-    "@types/node": "^25.3.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
+    "@biomejs/biome": "2.5.11",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/bun": "^1.4.0",
+    "@types/node": "^22.20.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "babel-plugin-react-compiler": "1.0.0",
-    "dotenv": "^17.3.1",
-    "esbuild": "^0.27.3",
-    "tailwindcss": "^4.2.1",
-    "typescript": "^5.9.3"
+    "dotenv": "^17.4.2",
+    "esbuild": "^0.28.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
   }
 }

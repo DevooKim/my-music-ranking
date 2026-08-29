@@ -6,9 +6,12 @@ Spotify Development Mode 대응(아티스트 개별 조회, 동시성 5, 429 재
 
 ## 개발 및 검증
 
+Bun 1.4와 TypeScript 7을 사용합니다.
+
 ```bash
-bun install
+bun install --frozen-lockfile
 bun test
+bun run typecheck
 bun run lint
 bun run build
 ```

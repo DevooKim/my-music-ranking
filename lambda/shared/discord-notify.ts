@@ -1,4 +1,7 @@
-import type { TrackStatsReadResult, TrackStatsWriteResult } from "./track-stats-storage";
+import type {
+  TrackStatsReadResult,
+  TrackStatsWriteResult,
+} from "./track-stats-storage";
 
 const DEFAULT_WEBHOOK_TIMEOUT_MS = 5000;
 
@@ -26,7 +29,7 @@ interface LambdaRuntimeStats {
 }
 
 export interface TrackStatsNotificationContext {
-  functionName: "weekly-processor" | "monthly-processor";
+  functionName: "weekly-processor" | "monthly-processor" | "yearly-processor";
   eventLabel: string;
   periodLabel: string;
   mode: string;
@@ -61,7 +64,9 @@ function toReadSourceLabel(read: TrackStatsReadResult): string {
   if (read.sourceError) {
     if (read.used === "both") {
       const fallbackTarget = read.fallbackFrom
-        ? read.fallbackFrom === "json" ? "parquet" : "json"
+        ? read.fallbackFrom === "json"
+          ? "parquet"
+          : "json"
         : "unknown";
       return `${fallbackTarget}(fallback_${fallbackSource}:${read.sourceError})`;
     }
@@ -97,22 +102,32 @@ function sectionHeader(label: string): DiscordField {
   };
 }
 
-export function buildTrackStatsNotificationPayload(context: TrackStatsNotificationContext): DiscordWebhookPayload {
+export function buildTrackStatsNotificationPayload(
+  context: TrackStatsNotificationContext,
+): DiscordWebhookPayload {
   const readSource = toReadSourceLabel(context.trackStatsRead);
-  const jsonReadBytes = formatBytes(context.trackStatsRead.bytesReadByFormat.json || 0);
+  const jsonReadBytes = formatBytes(
+    context.trackStatsRead.bytesReadByFormat.json || 0,
+  );
   const jsonWriteBytes = formatBytes(context.trackStatsWrite?.bytes.json || 0);
-  const parquetReadBytes = formatBytes(context.trackStatsRead.bytesReadByFormat.parquet || 0);
-  const parquetWriteBytes = formatBytes(context.trackStatsWrite?.bytes.parquet || 0);
+  const parquetReadBytes = formatBytes(
+    context.trackStatsRead.bytesReadByFormat.parquet || 0,
+  );
+  const parquetWriteBytes = formatBytes(
+    context.trackStatsWrite?.bytes.parquet || 0,
+  );
   const executionMs = context.runtime?.executionMs ?? context.durationsMs.total;
   const memoryUsedMb = context.runtime?.memoryUsedMB.toFixed(1) ?? null;
-  const memoryLimit = context.runtime?.memoryLimitMB && context.runtime.memoryLimitMB > 0
-    ? context.runtime.memoryLimitMB
-    : null;
-  const memoryValue = memoryUsedMb === null
-    ? "N/A"
-    : memoryLimit
-      ? `${memoryUsedMb} MB / limit ${memoryLimit} MB`
-      : `${memoryUsedMb} MB`;
+  const memoryLimit =
+    context.runtime?.memoryLimitMB && context.runtime.memoryLimitMB > 0
+      ? context.runtime.memoryLimitMB
+      : null;
+  const memoryValue =
+    memoryUsedMb === null
+      ? "N/A"
+      : memoryLimit
+        ? `${memoryUsedMb} MB / limit ${memoryLimit} MB`
+        : `${memoryUsedMb} MB`;
 
   const fields: DiscordField[] = [
     sectionHeader("function"),
