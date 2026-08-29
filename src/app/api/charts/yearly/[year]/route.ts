@@ -1,14 +1,20 @@
+import { getCachePolicy } from "@/lib/charts/cache-policy";
 import { toApiResponse } from "@/lib/charts/http";
-import { getYearlyChart } from "@/lib/charts/service";
 import { getCurrentYearPeriod, isYearPeriodAfter } from "@/lib/charts/period";
+import { getYearlyChart } from "@/lib/charts/service";
+import { parseBoundedDecimal } from "@/lib/routing/decimal";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const parseIntParam = (value: string): number => {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed)) throw new Error("invalid");
-  return parsed;
-};
+const invalidParameterResponse = () =>
+  new Response(JSON.stringify({ error: "유효하지 않은 연도입니다." }), {
+    status: 400,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
+  });
 
 export async function GET(
   _request: Request,
@@ -16,16 +22,10 @@ export async function GET(
 ) {
   try {
     const { year } = await params;
-    const parsedYear = parseIntParam(year);
+    const parsedYear = parseBoundedDecimal(year, 2000, 2500);
 
-    if (parsedYear < 2000 || parsedYear > 2500) {
-      return new Response(
-        JSON.stringify({ error: "유효하지 않은 연도입니다." }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+    if (parsedYear === null) {
+      return invalidParameterResponse();
     }
 
     const current = getCurrentYearPeriod();
@@ -34,7 +34,10 @@ export async function GET(
         JSON.stringify({ error: "요청한 연도는 아직 집계되지 않았습니다." }),
         {
           status: 404,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": getCachePolicy("not_found").cacheControl,
+          },
         },
       );
     }
@@ -43,10 +46,13 @@ export async function GET(
     return toApiResponse(result);
   } catch {
     return new Response(
-      JSON.stringify({ error: "유효하지 않은 연도입니다." }),
+      JSON.stringify({ error: "차트 조회 중 오류가 발생했습니다." }),
       {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
       },
     );
   }

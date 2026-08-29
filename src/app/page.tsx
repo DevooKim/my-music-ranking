@@ -2,6 +2,10 @@ import { moveWeekPeriod } from "@/lib/charts/period";
 import { getCurrentPeriods, getLatestWeeklyChart } from "@/lib/charts/service";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
+
 export default async function HomePage({
   searchParams,
 }: {
@@ -11,6 +15,8 @@ export default async function HomePage({
   const weeklyViewMode = toWeeklyViewMode(resolvedSearchParams.view);
 
   const result = await getLatestWeeklyChart();
+  if (result.kind === "error") throw new Error(result.message);
+
   const current = getCurrentPeriods();
 
   const previousWeek = moveWeekPeriod(current.weekly, -1);

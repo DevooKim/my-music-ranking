@@ -1,17 +1,38 @@
-import { subMonths, startOfMonth, endOfMonth, eachWeekOfInterval, getISOWeek, getISOWeekYear } from "date-fns";
 import { TZDate } from "@date-fns/tz";
+import {
+  eachWeekOfInterval,
+  endOfMonth,
+  getISOWeek,
+  getISOWeekYear,
+  startOfMonth,
+  subMonths,
+} from "date-fns";
 import { buildChart } from "../shared/chart";
-import { s3Paths, getS3Json, putS3Json } from "../shared/s3";
-import type { RawPlayedData, PlayedItem, ChartResponse, TrackStats } from "../shared/types";
+import {
+  buildTrackStatsNotificationPayload,
+  sendDiscordNotification,
+} from "../shared/discord-notify";
+import {
+  buildTrackStatsRevalidationPayloads,
+  revalidateChartCache,
+} from "../shared/revalidate";
+import { getS3Json, putS3Json, s3Paths } from "../shared/s3";
 import { getTrackStats, putTrackStats } from "../shared/track-stats-storage";
-import { buildTrackStatsNotificationPayload, sendDiscordNotification } from "../shared/discord-notify";
+import type {
+  ChartResponse,
+  PlayedItem,
+  RawPlayedData,
+  TrackStats,
+} from "../shared/types";
 
 const KOREA_TIMEZONE = "Asia/Seoul";
 type LambdaContextLike = { memoryLimitInMB?: number | string };
 
 function getLambdaRuntime(startMs: number, context?: LambdaContextLike) {
   const memory = process.memoryUsage();
-  const memoryLimitMB = context?.memoryLimitInMB ? Number(context.memoryLimitInMB) : undefined;
+  const memoryLimitMB = context?.memoryLimitInMB
+    ? Number(context.memoryLimitInMB)
+    : undefined;
 
   return {
     executionMs: Date.now() - startMs,
@@ -29,7 +50,9 @@ function getDiscordWebhook(): string | undefined {
   return process.env.DISCORD_WEBHOOK_URL;
 }
 
-async function notifyDiscord(context: Parameters<typeof buildTrackStatsNotificationPayload>[0]): Promise<void> {
+async function notifyDiscord(
+  context: Parameters<typeof buildTrackStatsNotificationPayload>[0],
+): Promise<void> {
   if (!isDiscordEnabled()) return;
   await sendDiscordNotification(context, getDiscordWebhook());
 }
@@ -38,10 +61,13 @@ function toKstDate(isoString: string): TZDate {
   return new TZDate(isoString, KOREA_TIMEZONE);
 }
 
-export const handler = async (_event: unknown, context?: LambdaContextLike): Promise<void> => {
+export const handler = async (
+  _event: unknown,
+  context?: LambdaContextLike,
+): Promise<void> => {
   const totalStart = Date.now();
   const now = new TZDate(new Date(), KOREA_TIMEZONE);
-  
+
   // 지난 달 정보
   const lastMonth = subMonths(now, 1);
   const year = lastMonth.getFullYear();
@@ -49,25 +75,28 @@ export const handler = async (_event: unknown, context?: LambdaContextLike): Pro
   const startDate = startOfMonth(lastMonth);
   const endDate = endOfMonth(lastMonth);
   const periodLabel = `${year}-${String(month).padStart(2, "0")}`;
-  
+
   console.log(`Processing monthly chart: ${periodLabel}`);
-  
+
   try {
     const trackStatsRead = await getTrackStats();
 
     // 1. 해당 월에 걸쳐있는 모든 주차의 raw 파일 읽기
-    const weeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 });
+    const weeks = eachWeekOfInterval(
+      { start: startDate, end: endDate },
+      { weekStartsOn: 1 },
+    );
     const allItems: PlayedItem[] = [];
-    
+
     const rawReadStart = Date.now();
     for (const weekStart of weeks) {
       const isoYear = getISOWeekYear(weekStart);
       const isoWeek = getISOWeek(weekStart);
-      
+
       const rawData = await getS3Json<RawPlayedData>(
-        s3Paths.raw(isoYear, isoWeek)
+        s3Paths.raw(isoYear, isoWeek),
       );
-      
+
       if (rawData) {
         // 해당 월의 데이터만 필터링 (played_at 기준)
         const filtered = rawData.items.filter((item) => {
@@ -78,9 +107,9 @@ export const handler = async (_event: unknown, context?: LambdaContextLike): Pro
       }
     }
     const rawReadDuration = Date.now() - rawReadStart;
-    
+
     console.log(`Loaded ${allItems.length} items from raw files`);
-    
+
     if (allItems.length === 0) {
       console.log("No items found for this month");
       await notifyDiscord(
@@ -109,13 +138,16 @@ export const handler = async (_event: unknown, context?: LambdaContextLike): Pro
       );
       return;
     }
-    
+
     // 2. 지난달 차트 읽기 (LM 계산용)
     const prevMonth = subMonths(lastMonth, 1);
     const lastChart = await getS3Json<ChartResponse>(
-      s3Paths.monthlyProcessed(prevMonth.getFullYear(), prevMonth.getMonth() + 1)
+      s3Paths.monthlyProcessed(
+        prevMonth.getFullYear(),
+        prevMonth.getMonth() + 1,
+      ),
     );
-    
+
     // 3. track-stats.json 읽기
     const buildStart = Date.now();
     const { chart, updatedStats } = buildChart({
@@ -132,14 +164,25 @@ export const handler = async (_event: unknown, context?: LambdaContextLike): Pro
       trackStats: trackStatsRead.data,
     });
     const buildDuration = Date.now() - buildStart;
-    
+
     // 5. 차트 저장
     await putS3Json(s3Paths.monthlyProcessed(year, month), chart);
+    await revalidateChartCache({
+      kind: "chart",
+      chartType: "monthly",
+      year,
+      month,
+    });
     console.log(`Saved monthly chart: ${chart.items.length} items`);
-    
+
     // 6. track-stats 업데이트
     const writeStart = Date.now();
     const trackStatsWrite = await putTrackStats(updatedStats);
+    for (const payload of buildTrackStatsRevalidationPayloads(
+      trackStatsWrite.partialFailure,
+    )) {
+      await revalidateChartCache(payload);
+    }
     const writeDuration = Date.now() - writeStart;
     console.log(`Updated track stats`);
 
@@ -147,7 +190,7 @@ export const handler = async (_event: unknown, context?: LambdaContextLike): Pro
     const eventLabel = trackStatsWrite.partialFailure
       ? "track-stats.process.partial_write"
       : "track-stats.process.success";
-    
+
     await notifyDiscord(
       buildTrackStatsNotificationPayload({
         functionName: "monthly-processor",
@@ -173,7 +216,6 @@ export const handler = async (_event: unknown, context?: LambdaContextLike): Pro
         errors: trackStatsWrite.warnings,
       }),
     );
-    
   } catch (error) {
     console.error("Monthly processing failed:", error);
     try {

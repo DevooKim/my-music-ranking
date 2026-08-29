@@ -7,7 +7,7 @@ export type CachePolicyScope =
   | "latest_not_found";
 
 export interface CachePolicyInfo {
-  scope: CachePolicyScope;
+  scope: CachePolicyScope | "error";
   maxAgeSeconds: number;
   staleWhileRevalidateSeconds: number;
   cacheControl: string;

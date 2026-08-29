@@ -5,13 +5,24 @@ import {
   moveWeekPeriod,
 } from "@/lib/charts/period";
 import { getCurrentPeriods, getWeeklyChart } from "@/lib/charts/service";
+import { parseBoundedDecimal } from "@/lib/routing/decimal";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
 
-const parseIntParam = (value: string): number => {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed)) throw new Error("invalid");
+const parseYear = (value: string): number => {
+  const parsed = parseBoundedDecimal(value, 2000, 2500);
+  if (parsed === null) notFound();
   return parsed;
 };
+
+const parseWeek = (value: string): number => {
+  const parsed = parseBoundedDecimal(value, 1, 53);
+  if (parsed === null) notFound();
+  return parsed;
+};
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
 
 export default async function WeeklyDetailPage({
   params,
@@ -26,12 +37,8 @@ export default async function WeeklyDetailPage({
   ]);
   const weeklyViewMode = toWeeklyViewMode(resolvedSearchParams.view);
 
-  const year = parseIntParam(isoYear);
-  const week = parseIntParam(isoWeek);
-
-  if (year < 2000 || week < 1 || week > 53) {
-    notFound();
-  }
+  const year = parseYear(isoYear);
+  const week = parseWeek(isoWeek);
 
   const period = getWeekPeriod(year, week);
   const current = getCurrentPeriods();
@@ -49,6 +56,7 @@ export default async function WeeklyDetailPage({
       : `/weekly/${next.isoYear}/${String(next.isoWeek).padStart(2, "0")}`;
 
   const result = await getWeeklyChart(year, week);
+  if (result.kind === "error") throw new Error(result.message);
 
   return (
     <ChartPageContent

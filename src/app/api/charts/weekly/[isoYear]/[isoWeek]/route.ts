@@ -1,18 +1,24 @@
+import { getCachePolicy } from "@/lib/charts/cache-policy";
 import { toApiResponse } from "@/lib/charts/http";
-import { getWeeklyChart } from "@/lib/charts/service";
 import {
   getCurrentWeekPeriod,
   getWeekPeriod,
   isWeekPeriodAfter,
 } from "@/lib/charts/period";
+import { getWeeklyChart } from "@/lib/charts/service";
+import { parseBoundedDecimal } from "@/lib/routing/decimal";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const parseIntParam = (value: string): number => {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed)) throw new Error("invalid");
-  return parsed;
-};
+const invalidParameterResponse = () =>
+  new Response(JSON.stringify({ error: "유효하지 않은 파라미터입니다." }), {
+    status: 400,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
+  });
 
 export async function GET(
   _request: Request,
@@ -20,17 +26,11 @@ export async function GET(
 ) {
   try {
     const { isoYear, isoWeek } = await params;
-    const year = parseIntParam(isoYear);
-    const week = parseIntParam(isoWeek);
+    const year = parseBoundedDecimal(isoYear, 2000, 2500);
+    const week = parseBoundedDecimal(isoWeek, 1, 53);
 
-    if (year < 2000 || week < 1 || week > 53) {
-      return new Response(
-        JSON.stringify({ error: "유효하지 않은 파라미터입니다." }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+    if (year === null || week === null) {
+      return invalidParameterResponse();
     }
 
     const current = getCurrentWeekPeriod();
@@ -40,7 +40,10 @@ export async function GET(
         JSON.stringify({ error: "요청한 주차는 아직 집계되지 않았습니다." }),
         {
           status: 404,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": getCachePolicy("not_found").cacheControl,
+          },
         },
       );
     }
@@ -49,10 +52,13 @@ export async function GET(
     return toApiResponse(result);
   } catch {
     return new Response(
-      JSON.stringify({ error: "유효하지 않은 파라미터입니다." }),
+      JSON.stringify({ error: "차트 조회 중 오류가 발생했습니다." }),
       {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
       },
     );
   }

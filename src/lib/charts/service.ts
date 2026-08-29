@@ -1,19 +1,20 @@
-import { getCachePolicy } from "@/lib/charts/cache-policy";
+import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
+import { getCachePolicy, noStoreCachePolicy } from "@/lib/charts/cache-policy";
 import {
   getCurrentMonthPeriod,
   getCurrentWeekPeriod,
   getCurrentYearPeriod,
   getMonthPeriod,
-  isWeekPeriodEqual,
   getWeekPeriod,
   getYearPeriod,
+  isWeekPeriodEqual,
   moveWeekPeriod,
   type WeekPeriod,
 } from "@/lib/charts/period";
 import {
   getMonthlyChartFromS3,
-  getWeeklyArtistChartFromS3,
   getTrackStatsForWeekly,
+  getWeeklyArtistChartFromS3,
   getWeeklyChartFromS3,
   getWeeklyRawChartFromS3,
   getYearlyChartFromS3,
@@ -29,7 +30,6 @@ import type {
   ChartResponse,
   NotReadyChartResponse,
 } from "@/lib/charts/types";
-import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
 
 const formatError = (error: unknown): string => {
   if (error instanceof Error) {
@@ -44,13 +44,10 @@ const logServiceError = (
   error: unknown,
   meta?: Record<string, unknown>,
 ): void => {
-  console.error(
-    `[chart-service:${type}] ${context}`,
-    {
-      ...meta,
-      error: formatError(error),
-    },
-  );
+  console.error(`[chart-service:${type}] ${context}`, {
+    ...meta,
+    error: formatError(error),
+  });
 };
 
 type RawPlayedItem = RawPlayedDataLike["items"][number] & {
@@ -274,7 +271,10 @@ const applyRawWeeklyHistory = (
       items: chart.items.map((item) => {
         const hasEverAppeared = wasTrackSeenBefore(trackStats, item.trackId);
         const wasRecentlySeen = recentTrackIds?.has(item.trackId) ?? false;
-        const peakFromTrackStats = getTrackPeakRankFromStats(trackStats, item.trackId);
+        const peakFromTrackStats = getTrackPeakRankFromStats(
+          trackStats,
+          item.trackId,
+        );
 
         return {
           ...item,
@@ -284,9 +284,9 @@ const applyRawWeeklyHistory = (
           entryStatus:
             hasEverAppeared && !wasRecentlySeen
               ? "reentry"
-                : hasEverAppeared
-                  ? null
-                  : "new",
+              : hasEverAppeared
+                ? null
+                : "new",
         };
       }),
     };
@@ -299,7 +299,10 @@ const applyRawWeeklyHistory = (
       if (!previous) {
         const hasEverAppeared = wasTrackSeenBefore(trackStats, item.trackId);
         const wasRecentlySeen = recentTrackIds?.has(item.trackId) ?? false;
-        const peakFromTrackStats = getTrackPeakRankFromStats(trackStats, item.trackId);
+        const peakFromTrackStats = getTrackPeakRankFromStats(
+          trackStats,
+          item.trackId,
+        );
 
         return {
           ...item,
@@ -403,7 +406,7 @@ const buildError = (
   type,
   statusCode: 500,
   message,
-  cachePolicy: getCachePolicy("not_found"),
+  cachePolicy: noStoreCachePolicy,
 });
 
 const buildNotReady = (
@@ -489,7 +492,11 @@ export const getWeeklyChart = async (
   try {
     const chart = await getWeeklyChartFromS3(isoYear, isoWeek, lookupScope);
     if (!chart) {
-      const rawChart = await getWeeklyRawChartFromS3(isoYear, isoWeek, lookupScope);
+      const rawChart = await getWeeklyRawChartFromS3(
+        isoYear,
+        isoWeek,
+        lookupScope,
+      );
       if (rawChart && rawChart.items.length > 0) {
         const { recentTrackIds, trackStats } =
           await getRecentAndEverSeenWeeklyTrackIds(period, lookupScope);
@@ -514,7 +521,6 @@ export const getWeeklyChart = async (
         } satisfies ChartFoundResult;
       }
 
-      const notReadyPolicy: CachePolicyScope = lookupScope;
       return {
         ...buildNotReady({
           status: "not_ready",
@@ -524,7 +530,7 @@ export const getWeeklyChart = async (
           detail:
             "미래 주차이거나 Lambda가 아직 집계하지 않은 구간일 수 있습니다.",
         }),
-        cachePolicy: getCachePolicy(notReadyPolicy),
+        cachePolicy: getCachePolicy("not_found"),
       };
     }
 
@@ -582,7 +588,7 @@ export const getMonthlyChart = async (
           message: "요청한 월 처리본이 아직 존재하지 않습니다.",
           detail: "월간 집계 스케줄이 완료되지 않은 구간일 수 있습니다.",
         }),
-        cachePolicy: getCachePolicy(lookupScope),
+        cachePolicy: getCachePolicy("not_found"),
       };
     }
 
@@ -630,7 +636,7 @@ export const getYearlyChart = async (
           message: "요청한 연도 처리본이 아직 존재하지 않습니다.",
           detail: "연간 집계가 완료되지 않은 구간일 수 있습니다.",
         }),
-        cachePolicy: getCachePolicy(lookupScope),
+        cachePolicy: getCachePolicy("not_found"),
       };
     }
 

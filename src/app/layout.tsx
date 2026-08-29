@@ -1,11 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
+import { QueryProvider } from "@/lib/ui/common/QueryProvider";
 import { ScrollToTopButton } from "@/lib/ui/common/ScrollToTopButton";
 import { ServiceWorkerRegister } from "@/lib/ui/common/ServiceWorkerRegister";
-import { QueryProvider } from "@/lib/ui/common/QueryProvider";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const manrope = Manrope({
   variable: "--font-geist-sans",
@@ -13,11 +11,15 @@ const manrope = Manrope({
   weight: ["400", "500", "600", "700", "800"],
 });
 
-const notoSansKr = Noto_Sans_KR({ variable: "--font-geist-mono", subsets: ["latin"] });
+const notoSansKr = Noto_Sans_KR({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: "my-music-ranking",
-  description: "My Music Ranking - 주간/월간/연간 랭킹을 S3 처리본 기반으로 보여주는 앱",
+  description:
+    "My Music Ranking - 주간/월간/연간 랭킹을 S3 처리본 기반으로 보여주는 앱",
   manifest: "/manifest.webmanifest",
   applicationName: "My Music Ranking",
   appleWebApp: {
@@ -49,10 +51,10 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/pwa-192.png" sizes="192x192" />
         <link rel="apple-touch-icon" href="/pwa-512.png" sizes="512x512" />
       </head>
-      <body className={`${manrope.variable} ${notoSansKr.variable} antialiased`}>
+      <body
+        className={`${manrope.variable} ${notoSansKr.variable} antialiased`}
+      >
         <QueryProvider>{children}</QueryProvider>
-        <Analytics />
-        <SpeedInsights />
         <ScrollToTopButton />
         <ServiceWorkerRegister />
       </body>

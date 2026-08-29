@@ -1,14 +1,20 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { unstable_cache, revalidateTag } from "next/cache";
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { revalidateTag, unstable_cache } from "next/cache";
 
 export const bucketName =
   process.env.S3_BUCKET_NAME ||
   process.env.AWS_BUCKET_NAME ||
   process.env.S3_BUCKET ||
   "my-music-ranking";
-const region =
-  process.env.S3_REGION || "ap-northeast-2";
-const parseIntOrDefault = (value: string | undefined, fallback: number): number => {
+const region = process.env.S3_REGION || "ap-northeast-2";
+const parseIntOrDefault = (
+  value: string | undefined,
+  fallback: number,
+): number => {
   const parsed = Number.parseInt(value || "", 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
@@ -43,7 +49,6 @@ export const chartS3Keys = {
 const isNotFoundError = (error: unknown): boolean => {
   const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
   return (
-    e?.name === "AccessDenied" ||
     e?.name === "NoSuchKey" ||
     e?.name === "NotFound" ||
     e?.$metadata?.httpStatusCode === 404
@@ -66,7 +71,9 @@ export const getJsonFromS3 = async <T>(key: string): Promise<T | null> => {
       return null;
     }
     if (!response.ok) {
-      throw new Error(`S3 fetch failed: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `S3 fetch failed: ${response.status} ${response.statusText}`,
+      );
     }
 
     const rawText = await response.text();
@@ -79,9 +86,7 @@ export const getJsonFromS3 = async <T>(key: string): Promise<T | null> => {
   }
 };
 
-const getJsonFromPrivateS3Raw = async <T>(
-  key: string,
-): Promise<T | null> => {
+const getJsonFromPrivateS3Raw = async <T>(key: string): Promise<T | null> => {
   try {
     const result = await s3Client.send(
       new GetObjectCommand({
@@ -117,7 +122,10 @@ export const getJsonFromPrivateS3 = async <T>(
   return raw as T | null;
 };
 
-export const putJsonToS3 = async (key: string, data: unknown): Promise<void> => {
+export const putJsonToS3 = async (
+  key: string,
+  data: unknown,
+): Promise<void> => {
   await s3Client.send(
     new PutObjectCommand({
       Bucket: bucketName,
@@ -126,5 +134,5 @@ export const putJsonToS3 = async (key: string, data: unknown): Promise<void> => 
       ContentType: "application/json",
     }),
   );
-  revalidateTag(PRIVATE_S3_CACHE_TAG, "max");
+  revalidateTag(PRIVATE_S3_CACHE_TAG, { expire: 0 });
 };
