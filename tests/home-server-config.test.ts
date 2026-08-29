@@ -38,6 +38,22 @@ describe("home-server deployment configuration", () => {
     expect(nginx).toContain("location ~ ^/(weekly|monthly|yearly)");
   });
 
+  test("renders unavailable periods instead of the framework 404 page", () => {
+    for (const page of [
+      "src/app/page.tsx",
+      "src/app/weekly/[isoYear]/[isoWeek]/page.tsx",
+      "src/app/monthly/[year]/[month]/page.tsx",
+      "src/app/yearly/[year]/page.tsx",
+    ]) {
+      expect(read(page)).not.toContain(
+        'result.kind === "not_found") notFound()',
+      );
+    }
+    expect(read("src/lib/ui/charts/ChartPageContent.tsx")).toContain(
+      "현재 구간은 아직 집계되지 않았습니다.",
+    );
+  });
+
   test("uses immediate Next invalidation without a nested latest cache", () => {
     expect(read("src/app/api/revalidate/route.ts")).toContain("{ expire: 0 }");
     expect(read("src/lib/charts/s3.ts")).toContain("{ expire: 0 }");

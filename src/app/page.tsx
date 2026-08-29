@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import { moveWeekPeriod } from "@/lib/charts/period";
 import { getCurrentPeriods, getLatestWeeklyChart } from "@/lib/charts/service";
 import { ChartPageContent } from "@/lib/ui/charts/ChartPageContent";
@@ -16,7 +15,6 @@ export default async function HomePage({
   const weeklyViewMode = toWeeklyViewMode(resolvedSearchParams.view);
 
   const result = await getLatestWeeklyChart();
-  if (result.kind === "not_found") notFound();
   if (result.kind === "error") throw new Error(result.message);
 
   const current = getCurrentPeriods();

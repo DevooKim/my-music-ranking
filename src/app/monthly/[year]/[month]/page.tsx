@@ -43,7 +43,6 @@ export default async function MonthlyDetailPage({
     : `/monthly/${next.year}/${String(next.month).padStart(2, "0")}`;
 
   const result = await getMonthlyChart(parsedYear, parsedMonth);
-  if (result.kind === "not_found") notFound();
   if (result.kind === "error") throw new Error(result.message);
 
   return (

@@ -31,7 +31,6 @@ export default async function YearlyDetailPage({
   const nextHref = isNextAfterCurrent ? undefined : `/yearly/${next.year}`;
 
   const result = await getYearlyChart(parsedYear);
-  if (result.kind === "not_found") notFound();
   if (result.kind === "error") throw new Error(result.message);
 
   return (

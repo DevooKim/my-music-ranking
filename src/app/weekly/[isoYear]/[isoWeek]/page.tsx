@@ -56,7 +56,6 @@ export default async function WeeklyDetailPage({
       : `/weekly/${next.isoYear}/${String(next.isoWeek).padStart(2, "0")}`;
 
   const result = await getWeeklyChart(year, week);
-  if (result.kind === "not_found") notFound();
   if (result.kind === "error") throw new Error(result.message);
 
   return (
