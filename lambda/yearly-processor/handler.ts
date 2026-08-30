@@ -45,10 +45,10 @@ function getDiscordWebhook(): string | undefined {
 }
 
 async function notifyDiscord(
-  context: Parameters<typeof buildTrackStatsNotificationPayload>[0],
+  payload: ReturnType<typeof buildTrackStatsNotificationPayload>,
 ): Promise<void> {
   if (!isDiscordEnabled()) return;
-  await sendDiscordNotification(context, getDiscordWebhook());
+  await sendDiscordNotification(payload, getDiscordWebhook());
 }
 
 function toKstDate(isoString: string): TZDate {

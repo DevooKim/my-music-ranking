@@ -30,6 +30,11 @@ type ArtistChartListProps = {
   onVisibleArtistIdsChange?: (artistIds: string[]) => void;
 };
 
+type ArtistVirtualizer = Pick<
+  ReturnType<typeof useWindowVirtualizer>,
+  "getVirtualItems"
+>;
+
 const ArtistChartList = ({
   items,
   onVisibleArtistIdsChange,
@@ -42,7 +47,7 @@ const ArtistChartList = ({
   const rowGap = isMobile ? ITEM_GAP_MOBILE : ITEM_GAP;
 
   const syncVisibleIds = useCallback(
-    (virtualizer: ReturnType<typeof useWindowVirtualizer>) => {
+    (virtualizer: ArtistVirtualizer) => {
       if (!onVisibleArtistIdsChange) return;
       const virtualItems = virtualizer.getVirtualItems();
       if (virtualItems.length === 0) return;
