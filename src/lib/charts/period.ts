@@ -1,17 +1,3 @@
-import {
-  addDays,
-  addMonths,
-  addYears,
-  endOfISOWeek,
-  endOfMonth,
-  endOfYear,
-  getISOWeek,
-  getISOWeekYear,
-  startOfISOWeek,
-  startOfMonth,
-  startOfYear,
-} from "date-fns";
-
 export interface WeekPeriod {
   isoYear: number;
   isoWeek: number;
@@ -33,12 +19,18 @@ export interface YearPeriod {
 }
 
 const pad2 = (value: number): string => String(value).padStart(2, "0");
+// 이 모듈의 모든 기간 경계는 UTC 기준으로 계산하고 UTC 기준으로 직렬화한다.
+// 프로세스 로컬 TZ에 의존하는 Date 생성자나 date-fns 로컬 함수를 섞으면
+// TZ가 UTC보다 앞선 환경에서 경계가 하루 밀린다.
 const toDateKey = (value: Date): string => value.toISOString().slice(0, 10);
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
-const CHART_TIME_ZONE = process.env.CHART_TIME_ZONE || process.env.APP_TIME_ZONE || "Asia/Seoul";
+const CHART_TIME_ZONE =
+  process.env.CHART_TIME_ZONE || process.env.APP_TIME_ZONE || "Asia/Seoul";
 
-const getDatePartsInZone = (date: Date = new Date()): { year: number; month: number; day: number } => {
+const getDatePartsInZone = (
+  date: Date = new Date(),
+): { year: number; month: number; day: number } => {
   try {
     const formatter = new Intl.DateTimeFormat("en-US", {
       timeZone: CHART_TIME_ZONE,
@@ -72,14 +64,19 @@ const getDateInChartZone = (date?: Date): Date => {
 
 const getIsoWeekInfo = (date: Date): { isoYear: number; isoWeek: number } => {
   const dayOfWeek = (date.getUTCDay() + 6) % 7; // Monday = 0
-  const shiftedToThursday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  shiftedToThursday.setUTCDate(shiftedToThursday.getUTCDate() + (3 - dayOfWeek));
+  const shiftedToThursday = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+  shiftedToThursday.setUTCDate(
+    shiftedToThursday.getUTCDate() + (3 - dayOfWeek),
+  );
 
   const isoYear = shiftedToThursday.getUTCFullYear();
   const weekOneThursday = new Date(Date.UTC(isoYear, 0, 4));
   const weekOneDayOfWeek = (weekOneThursday.getUTCDay() + 6) % 7;
   const weekOneStart = weekOneThursday.getTime() - weekOneDayOfWeek * DAY_MS;
-  const isoWeek = Math.floor((shiftedToThursday.getTime() - weekOneStart) / WEEK_MS) + 1;
+  const isoWeek =
+    Math.floor((shiftedToThursday.getTime() - weekOneStart) / WEEK_MS) + 1;
 
   return {
     isoYear,
@@ -88,15 +85,19 @@ const getIsoWeekInfo = (date: Date): { isoYear: number; isoWeek: number } => {
 };
 
 const isoWeekStart = (isoYear: number, isoWeek: number): Date => {
-  const jan4 = new Date(isoYear, 0, 4);
-  const firstWeekStart = startOfISOWeek(jan4);
-  return addDays(firstWeekStart, (isoWeek - 1) * 7);
+  // ISO 8601: 1주차는 1월 4일을 포함하는 주.
+  const jan4 = new Date(Date.UTC(isoYear, 0, 4));
+  const jan4DayOfWeek = (jan4.getUTCDay() + 6) % 7; // Monday = 0
+  const firstWeekStart = jan4.getTime() - jan4DayOfWeek * DAY_MS;
+  return new Date(firstWeekStart + (isoWeek - 1) * WEEK_MS);
 };
 
 export const getCurrentWeekPeriod = (date: Date = new Date()): WeekPeriod => {
   const zonedDate = getDateInChartZone(date);
   const week = getIsoWeekInfo(zonedDate);
-  const start = new Date(zonedDate.getTime() - (((zonedDate.getUTCDay() + 6) % 7) * DAY_MS));
+  const start = new Date(
+    zonedDate.getTime() - ((zonedDate.getUTCDay() + 6) % 7) * DAY_MS,
+  );
 
   return {
     isoYear: week.isoYear,
@@ -112,13 +113,19 @@ export const getWeekPeriod = (isoYear: number, isoWeek: number): WeekPeriod => {
     isoYear,
     isoWeek,
     start: toDateKey(start),
-    end: toDateKey(endOfISOWeek(start)),
+    end: toDateKey(new Date(start.getTime() + 6 * DAY_MS)),
   };
 };
 
-export const moveWeekPeriod = (period: WeekPeriod, offset: number): WeekPeriod => {
-  const moved = addDays(isoWeekStart(period.isoYear, period.isoWeek), offset * 7);
-  return getWeekPeriod(getISOWeekYear(moved), getISOWeek(moved));
+export const moveWeekPeriod = (
+  period: WeekPeriod,
+  offset: number,
+): WeekPeriod => {
+  const moved = new Date(
+    isoWeekStart(period.isoYear, period.isoWeek).getTime() + offset * WEEK_MS,
+  );
+  const week = getIsoWeekInfo(moved);
+  return getWeekPeriod(week.isoYear, week.isoWeek);
 };
 
 export const formatWeekLabel = (period: WeekPeriod): string =>
@@ -126,8 +133,12 @@ export const formatWeekLabel = (period: WeekPeriod): string =>
 
 export const getCurrentMonthPeriod = (date: Date = new Date()): MonthPeriod => {
   const zonedDate = getDateInChartZone(date);
-  const monthStart = new Date(Date.UTC(zonedDate.getUTCFullYear(), zonedDate.getUTCMonth(), 1));
-  const monthEnd = new Date(Date.UTC(zonedDate.getUTCFullYear(), zonedDate.getUTCMonth() + 1, 0));
+  const monthStart = new Date(
+    Date.UTC(zonedDate.getUTCFullYear(), zonedDate.getUTCMonth(), 1),
+  );
+  const monthEnd = new Date(
+    Date.UTC(zonedDate.getUTCFullYear(), zonedDate.getUTCMonth() + 1, 0),
+  );
   return {
     year: monthStart.getUTCFullYear(),
     month: monthStart.getUTCMonth() + 1,
@@ -137,13 +148,16 @@ export const getCurrentMonthPeriod = (date: Date = new Date()): MonthPeriod => {
 };
 
 export const getMonthPeriod = (year: number, month: number): MonthPeriod => {
-  const normalized = new Date(year, month - 1, 1);
-  const start = startOfMonth(normalized);
+  const start = new Date(Date.UTC(year, month - 1, 1));
+  // day=0 은 이전 달의 마지막 날 → 해당 월의 말일.
+  const end = new Date(
+    Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0),
+  );
   return {
-    year: start.getFullYear(),
-    month: start.getMonth() + 1,
+    year: start.getUTCFullYear(),
+    month: start.getUTCMonth() + 1,
     start: toDateKey(start),
-    end: toDateKey(endOfMonth(start)),
+    end: toDateKey(end),
   };
 };
 
@@ -171,9 +185,12 @@ export const isMonthPeriodAfter = (
 export const isYearPeriodAfter = (lhs: number, rhs: number): boolean =>
   lhs > rhs;
 
-export const moveMonthPeriod = (period: MonthPeriod, offset: number): MonthPeriod => {
-  const moved = addMonths(new Date(period.year, period.month - 1, 1), offset);
-  return getMonthPeriod(moved.getFullYear(), moved.getMonth() + 1);
+export const moveMonthPeriod = (
+  period: MonthPeriod,
+  offset: number,
+): MonthPeriod => {
+  const moved = new Date(Date.UTC(period.year, period.month - 1 + offset, 1));
+  return getMonthPeriod(moved.getUTCFullYear(), moved.getUTCMonth() + 1);
 };
 
 export const formatMonthLabel = (period: MonthPeriod): string =>
@@ -191,23 +208,33 @@ export const getCurrentYearPeriod = (date: Date = new Date()): YearPeriod => {
 };
 
 export const getYearPeriod = (year: number): YearPeriod => {
-  const start = startOfYear(new Date(year, 0, 1));
+  const start = new Date(Date.UTC(year, 0, 1));
+  const end = new Date(Date.UTC(year, 11, 31));
   return {
-    year: start.getFullYear(),
+    year: start.getUTCFullYear(),
     start: toDateKey(start),
-    end: toDateKey(endOfYear(start)),
+    end: toDateKey(end),
   };
 };
 
-export const moveYearPeriod = (period: YearPeriod, offset: number): YearPeriod => {
-  const moved = addYears(new Date(period.year, 0, 1), offset);
-  return getYearPeriod(moved.getFullYear());
+export const moveYearPeriod = (
+  period: YearPeriod,
+  offset: number,
+): YearPeriod => {
+  return getYearPeriod(period.year + offset);
 };
 
 export const formatYearLabel = (period: YearPeriod): string => `${period.year}`;
 
 export const isValidMonth = (year: number, month: number): boolean => {
-  return Number.isInteger(year) && Number.isInteger(month) && year >= 2000 && month >= 1 && month <= 12;
+  return (
+    Number.isInteger(year) &&
+    Number.isInteger(month) &&
+    year >= 2000 &&
+    month >= 1 &&
+    month <= 12
+  );
 };
 
-export const isValidYear = (year: number): boolean => Number.isInteger(year) && year >= 2000 && year <= 2500;
+export const isValidYear = (year: number): boolean =>
+  Number.isInteger(year) && year >= 2000 && year <= 2500;
