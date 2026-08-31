@@ -7,7 +7,9 @@
     "build": "bun run --bun next build --webpack",
     "start": "bun run --bun next start",
     "lint": "biome check",
-    "format": "biome format --write"
+    "format": "biome format --write",
+    "test": "bun test",
+    "test:watch": "bun test --watch"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.995.0",
@@ -26,6 +28,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.4",
     "@tailwindcss/postcss": "^4.2.1",
+    "@types/bun": "^1.4.0",
     "@types/node": "^25.3.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
