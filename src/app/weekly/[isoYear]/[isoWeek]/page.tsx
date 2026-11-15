@@ -59,7 +59,7 @@ export default async function WeeklyDetailPage({
       activeScope="weekly"
       previousHref={`/weekly/${previous.isoYear}/${String(previous.isoWeek).padStart(2, "0")}`}
       nextHref={nextHref}
-      weeklyViewMode={weeklyViewMode}
+      viewMode={weeklyViewMode}
     />
   );
 }

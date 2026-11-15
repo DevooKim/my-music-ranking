@@ -2,9 +2,7 @@ import { unstable_cache } from "next/cache";
 
 import { getCachePolicy } from "@/lib/charts/cache-policy";
 import { buildPublicS3Url, chartS3Keys, getJsonFromS3 } from "@/lib/charts/s3";
-import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
 import type {
-  ArtistChartItem,
   CachePolicyScope,
   ChartResponse,
 } from "@/lib/charts/types";
@@ -40,15 +38,6 @@ type TrackStatsRow = {
   totalWeeksOnChart?: unknown;
 };
 
-type ArtistChartRow = {
-  artistId?: unknown;
-  artistName?: unknown;
-  artistImageUrl?: unknown;
-  playCount?: unknown;
-  totalDurationMs?: unknown;
-  trackCount?: unknown;
-};
-
 export interface WeeklyTrackStatsRecord {
   weeklyPeakRank: number;
   totalWeeksOnChart: number;
@@ -68,25 +57,6 @@ interface TrackStatsScopeLookup {
   not_found: () => Promise<WeeklyTrackStats | null>;
   latest: () => Promise<WeeklyTrackStats | null>;
   latest_not_found: () => Promise<WeeklyTrackStats | null>;
-}
-
-interface ArtistChartScopeLookup {
-  found: (
-    isoYear: number,
-    isoWeek: number,
-  ) => Promise<ArtistChartItem[] | null>;
-  not_found: (
-    isoYear: number,
-    isoWeek: number,
-  ) => Promise<ArtistChartItem[] | null>;
-  latest: (
-    isoYear: number,
-    isoWeek: number,
-  ) => Promise<ArtistChartItem[] | null>;
-  latest_not_found: (
-    isoYear: number,
-    isoWeek: number,
-  ) => Promise<ArtistChartItem[] | null>;
 }
 
 const isRawPlayedItem = (value: unknown): value is RawPlayedItem => {
@@ -268,6 +238,85 @@ const normalizeChartResponse = (value: ChartResponse): ChartResponse => ({
   })),
 });
 
+/**
+ * "없음" 결과를 Next 데이터 캐시에 남기지 않기 위한 신호.
+ * unstable_cache는 결과에 따라 TTL을 바꿀 수 없어서, 처리본이 아직 없는 구간을
+ * 조회하면 null이 found 정책(기본 30일)으로 굳어 버린다. 콜백에서 던지면 캐시에
+ * 기록되지 않는다.
+ */
+class S3ObjectMissingError extends Error {}
+
+type MemoEntry = { expiresAt: number; value: Promise<unknown> };
+
+const MEMO_MAX_ENTRIES = 200;
+const MEMO_MAX_TTL_MS = 5 * 60 * 1000;
+const memo = new Map<string, MemoEntry>();
+
+/**
+ * 인스턴스 메모리 캐시. 같은 키의 동시 요청을 하나로 합치고(in-flight dedupe),
+ * 짧은 시간 안의 반복 조회는 데이터 캐시 왕복 없이 돌려준다.
+ */
+const memoize = <T>(
+  key: string,
+  ttlMs: (value: T) => number,
+  load: () => Promise<T>,
+): Promise<T> => {
+  const now = Date.now();
+  const hit = memo.get(key);
+  if (hit && hit.expiresAt > now) return hit.value as Promise<T>;
+
+  const value = load();
+  // 진행 중에는 만료 없이 공유하고, 끝나면 결과에 맞는 TTL로 고친다.
+  const entry: MemoEntry = { expiresAt: Number.POSITIVE_INFINITY, value };
+  memo.delete(key);
+  memo.set(key, entry);
+  value.then(
+    (resolved) => {
+      if (memo.get(key) === entry) {
+        entry.expiresAt = Date.now() + ttlMs(resolved);
+      }
+    },
+    () => {
+      if (memo.get(key) === entry) memo.delete(key);
+    },
+  );
+
+  if (memo.size > MEMO_MAX_ENTRIES) {
+    const oldest = memo.keys().next().value;
+    if (oldest !== undefined) memo.delete(oldest);
+  }
+
+  return value;
+};
+
+const memoTtlMs = (scope: CachePolicyScope, value: unknown): number => {
+  // 없음은 처리본이 곧 생길 수 있으므로 not_found 정책만큼만 기억한다.
+  const policy = getCachePolicy(value === null ? "not_found" : scope);
+  return Math.min(policy.maxAgeSeconds * 1000, MEMO_MAX_TTL_MS);
+};
+
+/** null을 데이터 캐시에 남기지 않는 unstable_cache 래퍼 */
+const cacheUnlessMissing = async <T>(
+  load: () => Promise<T | null>,
+  keyParts: string[],
+  revalidate: number,
+): Promise<T | null> => {
+  try {
+    return await unstable_cache(
+      async () => {
+        const value = await load();
+        if (value === null) throw new S3ObjectMissingError();
+        return value;
+      },
+      keyParts,
+      { revalidate },
+    )();
+  } catch (error) {
+    if (error instanceof S3ObjectMissingError) return null;
+    throw error;
+  }
+};
+
 const createCachedJsonLookup = <T>(
   scope: CachePolicyScope,
   category: string,
@@ -275,13 +324,16 @@ const createCachedJsonLookup = <T>(
   const policy = getCachePolicy(scope);
 
   return (key: string): Promise<T | null> =>
-    unstable_cache(
-      async () => getJsonFromS3<T>(key),
-      [category, scope, key],
-      {
-        revalidate: policy.maxAgeSeconds,
-      },
-    )();
+    memoize(
+      `${category}|${scope}|${key}`,
+      (value) => memoTtlMs(scope, value),
+      () =>
+        cacheUnlessMissing(
+          () => getJsonFromS3<T>(key),
+          [category, scope, key],
+          policy.maxAgeSeconds,
+        ),
+    );
 };
 
 const createCachedTrackStatsLookup = (
@@ -349,123 +401,8 @@ const cachedYearlyCharts: CacheScopeLookup = {
 };
 
 
-const readWeeklyArtistChartByQuery = async (
-  isoYear: number,
-  isoWeek: number,
-): Promise<ArtistChartItem[] | null> => {
-  let duckdbClient: typeof import("@/lib/duckdb/client");
-  try {
-    duckdbClient = await import("@/lib/duckdb/client");
-  } catch (error) {
-    logServerError(
-      "DuckDB is not available. Fallback to chart item aggregation.",
-      error,
-    );
-    return null;
-  }
-
-  let rows: ArtistChartRow[];
-  try {
-    const connection = await duckdbClient.getDuckDB();
-    const rawWeekUrl = buildPublicS3Url(chartS3Keys.rawWeek(isoYear, isoWeek));
-
-    const sql = `
-      WITH flattened AS (
-        SELECT unnest(items) AS item
-        FROM read_json_auto('${rawWeekUrl}', union_by_name=true)
-      ),
-      expanded AS (
-        SELECT
-          t.artistId,
-          list_extract(item.artistNames, t.idx) AS artistName,
-          NULL::VARCHAR AS artistImageUrl,
-          item.trackId AS trackId,
-          CAST(item.durationMs AS BIGINT) AS durationMs,
-          CAST(item.playedAt AS TIMESTAMP) AS playedAt
-        FROM flattened, unnest(item.artistIds) WITH ORDINALITY AS t(artistId, idx)
-      )
-      SELECT
-        artistId,
-        any_value(artistName) AS artistName,
-        max(nullif(artistImageUrl, '')) AS artistImageUrl,
-        count(*) AS playCount,
-        coalesce(sum(durationMs), 0) AS totalDurationMs,
-        count(distinct trackId) AS trackCount
-      FROM expanded
-      WHERE artistId IS NOT NULL
-        AND artistId <> ''
-        AND artistName IS NOT NULL
-        AND artistName <> ''
-      GROUP BY artistId
-      ORDER BY playCount DESC, trackCount ASC, totalDurationMs ASC, min(playedAt) ASC
-    `;
-    rows = await duckdbClient.queryAll<ArtistChartRow>(connection, sql);
-  } catch (error) {
-    logServerError(
-      "Failed to query weekly artist chart from raw data. Fallback to chart item aggregation.",
-      error,
-    );
-    return null;
-  }
-
-  if (!rows.length) return null;
-
-  return rows.map((row, index) => ({
-    rank: index + 1,
-    artistId: toSafeString(row.artistId),
-    artistName: toSafeString(row.artistName),
-    playCount: toSafeNumber(row.playCount, 0),
-    totalDurationMs: toSafeNumber(row.totalDurationMs, 0),
-    trackCount: toSafeNumber(row.trackCount, 0),
-    artistImageUrl: toSafeString(row.artistImageUrl) || null,
-  }));
-};
-
-const createCachedWeeklyArtistLookup = (
-  scope: CachePolicyScope,
-): ((
-  isoYear: number,
-  isoWeek: number,
-) => Promise<ArtistChartItem[] | null>) => {
-  const policy = getCachePolicy(scope);
-
-  return (isoYear: number, isoWeek: number): Promise<ArtistChartItem[] | null> =>
-    unstable_cache(
-      async (): Promise<ArtistChartItem[] | null> => {
-        const queriedArtistItems = await readWeeklyArtistChartByQuery(isoYear, isoWeek);
-        if (queriedArtistItems) {
-          return queriedArtistItems;
-        }
-
-        const chart = await getWeeklyChartFromS3(isoYear, isoWeek, scope);
-        if (!chart) return null;
-        return buildArtistChartItems(chart.items);
-      },
-      ["chart:artist-weekly", scope, String(isoYear), String(isoWeek)],
-      {
-        revalidate: policy.maxAgeSeconds,
-      },
-    )();
-};
-
-const createCachedWeeklyArtistLookups = (): Record<
-  CachePolicyScope,
-  (
-    isoYear: number,
-    isoWeek: number,
-  ) => Promise<ArtistChartItem[] | null>
-> => ({
-  found: createCachedWeeklyArtistLookup("found"),
-  not_found: createCachedWeeklyArtistLookup("not_found"),
-  latest: createCachedWeeklyArtistLookup("latest"),
-  latest_not_found: createCachedWeeklyArtistLookup("latest_not_found"),
-});
-
 const resolveScope = (scope: CachePolicyScope | undefined): CachePolicyScope =>
   scope ?? "found";
-
-const cachedWeeklyArtistCharts: ArtistChartScopeLookup =
-  createCachedWeeklyArtistLookups();
 
 export const getWeeklyChartFromS3 = async (
   isoYear: number,
@@ -478,15 +415,6 @@ export const getWeeklyChartFromS3 = async (
   );
   if (!raw || !isChartResponse(raw)) return null;
   return normalizeChartResponse(raw);
-};
-
-export const getWeeklyArtistChartFromS3 = async (
-  isoYear: number,
-  isoWeek: number,
-  scope: CachePolicyScope = "found",
-): Promise<ArtistChartItem[] | null> => {
-  const cacheScope = resolveScope(scope);
-  return cachedWeeklyArtistCharts[cacheScope](isoYear, isoWeek);
 };
 
 export const getWeeklyRawChartFromS3 = async (

@@ -14,10 +14,15 @@ const parseIntParam = (value: string): number => {
 
 export default async function MonthlyDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ year: string; month: string }>;
+  searchParams?: Promise<{ view?: string }>;
 }) {
-  const { year, month } = await params;
+  const [{ year, month }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams ?? Promise.resolve({ view: undefined as string | undefined }),
+  ]);
 
   const parsedYear = parseIntParam(year);
   const parsedMonth = parseIntParam(month);
@@ -48,6 +53,7 @@ export default async function MonthlyDetailPage({
       activeScope="monthly"
       previousHref={`/monthly/${previous.year}/${String(previous.month).padStart(2, "0")}`}
       nextHref={nextHref}
+      viewMode={resolvedSearchParams.view === "artist" ? "artist" : "track"}
     />
   );
 }

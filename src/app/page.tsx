@@ -23,7 +23,7 @@ export default async function HomePage({
       periods={current}
       activeScope="weekly"
       previousHref={`/weekly/${previousWeek.isoYear}/${String(previousWeek.isoWeek).padStart(2, "0")}`}
-      weeklyViewMode={weeklyViewMode}
+      viewMode={weeklyViewMode}
     />
   );
 }

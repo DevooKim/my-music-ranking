@@ -12,7 +12,6 @@ import {
 } from "@/lib/charts/period";
 import {
   getMonthlyChartFromS3,
-  getWeeklyArtistChartFromS3,
   getTrackStatsForWeekly,
   getWeeklyChartFromS3,
   getWeeklyRawChartFromS3,
@@ -338,17 +337,18 @@ const collectRecentWeeklyTrackIds = async (
   lookupScope: CachePolicyScope,
   lookbackWeeks = REENTRY_LOOKBACK_WEEKS,
 ): Promise<Set<string>> => {
-  const trackIds = new Set<string>();
-  let cursor = period;
+  // 주차별 조회는 서로 독립이라 한꺼번에 보낸다.
+  const charts = await Promise.all(
+    Array.from({ length: lookbackWeeks }, (_, step) =>
+      getPreviousWeekChartForRaw(moveWeekPeriod(period, -step), lookupScope),
+    ),
+  );
 
-  for (let step = 0; step < lookbackWeeks; step += 1) {
-    const previous = await getPreviousWeekChartForRaw(cursor, lookupScope);
-    if (previous?.items?.length) {
-      for (const item of previous.items) {
-        trackIds.add(item.trackId);
-      }
+  const trackIds = new Set<string>();
+  for (const chart of charts) {
+    for (const item of chart?.items ?? []) {
+      trackIds.add(item.trackId);
     }
-    cursor = moveWeekPeriod(cursor, -1);
   }
 
   return trackIds;
@@ -491,12 +491,11 @@ export const getWeeklyChart = async (
     if (!chart) {
       const rawChart = await getWeeklyRawChartFromS3(isoYear, isoWeek, lookupScope);
       if (rawChart && rawChart.items.length > 0) {
-        const { recentTrackIds, trackStats } =
-          await getRecentAndEverSeenWeeklyTrackIds(period, lookupScope);
-        const previousWeekChart = await getPreviousWeekChartForRaw(
-          period,
-          lookupScope,
-        );
+        const [{ recentTrackIds, trackStats }, previousWeekChart] =
+          await Promise.all([
+            getRecentAndEverSeenWeeklyTrackIds(period, lookupScope),
+            getPreviousWeekChartForRaw(period, lookupScope),
+          ]);
         const chart = applyRawWeeklyHistory(
           toChartFromRawWeekly(rawChart, period),
           previousWeekChart,
@@ -528,18 +527,11 @@ export const getWeeklyChart = async (
       };
     }
 
-    const artistItems = await getWeeklyArtistChartFromS3(
-      isoYear,
-      isoWeek,
-      lookupScope,
-    );
-
-    const hydratedArtistItems = artistItems;
-
     return {
       kind: "found",
       chart,
-      artistItems: hydratedArtistItems ?? undefined,
+      // 처리본에는 해당 주의 모든 트랙이 들어 있어 raw를 다시 읽지 않고 집계한다.
+      artistItems: buildArtistChartItems(chart.items),
       cachePolicy: getCachePolicy(lookupScope),
     } satisfies ChartFoundResult;
   } catch (error) {
@@ -589,6 +581,7 @@ export const getMonthlyChart = async (
     return {
       kind: "found",
       chart,
+      artistItems: buildArtistChartItems(chart.items),
       cachePolicy: getCachePolicy(lookupScope),
     } satisfies ChartFoundResult;
   } catch (error) {
@@ -637,6 +630,7 @@ export const getYearlyChart = async (
     return {
       kind: "found",
       chart,
+      artistItems: buildArtistChartItems(chart.items),
       cachePolicy: getCachePolicy(lookupScope),
     } satisfies ChartFoundResult;
   } catch (error) {

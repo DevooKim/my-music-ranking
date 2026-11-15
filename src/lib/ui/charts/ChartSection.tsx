@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
 import { fetchArtistThumbnails } from "@/lib/charts/artist-thumbnail-query";
-import type { ArtistChartItem, ChartItem } from "@/lib/charts/types";
+import type { ArtistChartItem, ChartItem, ChartType } from "@/lib/charts/types";
 import { ChartList } from "@/lib/ui/charts/ChartList";
 
 /* eslint-disable @next/next/no-img-element */
@@ -17,8 +17,9 @@ const ITEM_HEIGHT_MOBILE = 78;
 const ITEM_GAP_MOBILE = 10;
 const ITEM_GAP = 10;
 
-type WeeklyChartSectionProps = {
+type ChartSectionProps = {
   items: ChartItem[];
+  chartType: ChartType;
   artistItems?: ArtistChartItem[];
   initialViewMode?: ViewMode;
 };
@@ -161,11 +162,12 @@ const ArtistChartList = ({
   );
 };
 
-export const WeeklyChartSection = ({
+export const ChartSection = ({
   items,
+  chartType,
   artistItems: providedArtistItems,
   initialViewMode = "track",
-}: WeeklyChartSectionProps) => {
+}: ChartSectionProps) => {
   const initialArtistItems = useMemo(
     () => providedArtistItems ?? buildArtistChartItems(items),
     [providedArtistItems, items],
@@ -189,8 +191,9 @@ export const WeeklyChartSection = ({
   );
 
   useEffect(() => {
+    // 보이는 아티스트 목록은 여기서 비우지 않는다. 자식 목록의 effect가 먼저
+    // 실행되므로, 비우면 ?view=artist로 바로 들어왔을 때 썸네일 조회가 막힌다.
     setArtistItems(initialArtistItems);
-    setVisibleArtistIds([]);
   }, [initialArtistItems]);
 
   useEffect(() => {
@@ -293,7 +296,7 @@ export const WeeklyChartSection = ({
       </div>
 
       {viewMode === "track" ? (
-        <ChartList items={items} chartType="weekly" />
+        <ChartList items={items} chartType={chartType} />
       ) : (
         <ArtistChartList
           items={artistItems}

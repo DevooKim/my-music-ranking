@@ -11,10 +11,15 @@ const parseIntParam = (value: string): number => {
 
 export default async function YearlyDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ year: string }>;
+  searchParams?: Promise<{ view?: string }>;
 }) {
-  const { year } = await params;
+  const [{ year }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams ?? Promise.resolve({ view: undefined as string | undefined }),
+  ]);
   const parsedYear = parseIntParam(year);
 
   if (parsedYear < 2000 || parsedYear > 2500) {
@@ -42,6 +47,7 @@ export default async function YearlyDetailPage({
       activeScope="yearly"
       previousHref={`/yearly/${previous.year}`}
       nextHref={nextHref}
+      viewMode={resolvedSearchParams.view === "artist" ? "artist" : "track"}
     />
   );
 }

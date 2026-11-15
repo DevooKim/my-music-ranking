@@ -1,4 +1,6 @@
+import { unstable_cache } from "next/cache";
 import { buildArtistChartItems } from "@/lib/charts/artist-ranking";
+import { getCachePolicy } from "@/lib/charts/cache-policy";
 import {
   getCurrentMonthPeriod,
   getCurrentWeekPeriod,
@@ -97,10 +99,10 @@ const buildMonthlySlots = (count: number): PeriodSlot[] => {
   });
 };
 
-export const getRankTrends = async (
+const computeRankTrends = async (
   unit: TrendUnit,
   range: number,
-): Promise<RankTrends> => {
+): Promise<{ trends: RankTrends; degraded: boolean }> => {
   const slots =
     unit === "weekly" ? buildWeeklySlots(range) : buildMonthlySlots(range);
   const results = await Promise.all(slots.map((slot) => slot.load()));
@@ -150,7 +152,7 @@ export const getRankTrends = async (
   let offset = 0;
   while (offset < length && trackEntries[offset] === null) offset += 1;
 
-  return {
+  const trends: RankTrends = {
     unit,
     periods: slots.slice(offset, length).map((slot, index) => ({
       key: slot.key,
@@ -165,4 +167,46 @@ export const getRankTrends = async (
     tracks: collectSeries(trackEntries.slice(offset, length)),
     artists: collectSeries(artistEntries.slice(offset, length)),
   };
+
+  return {
+    trends,
+    degraded: results.some((result) => result.kind === "error"),
+  };
+};
+
+/** 조회 오류가 섞인 결과를 캐시에 남기지 않기 위한 신호 */
+class DegradedTrendsError extends Error {
+  constructor(readonly trends: RankTrends) {
+    super("rank trends computed with lookup errors");
+  }
+}
+
+/**
+ * 그래프 한 장을 그리려면 구간 수만큼 차트를 읽어야 하므로, 합쳐진 결과를
+ * 통째로 캐시한다. 이번 주 차트가 갱신되는 주기(latest 정책)만큼만 유지하고,
+ * 구간이 넘어가면 키가 바뀌어 새로 계산한다.
+ */
+export const getRankTrends = async (
+  unit: TrendUnit,
+  range: number,
+): Promise<RankTrends> => {
+  const currentKey =
+    unit === "weekly"
+      ? getCurrentWeekPeriod().start
+      : getCurrentMonthPeriod().start;
+
+  try {
+    return await unstable_cache(
+      async () => {
+        const { trends, degraded } = await computeRankTrends(unit, range);
+        if (degraded) throw new DegradedTrendsError(trends);
+        return trends;
+      },
+      ["chart:trends", unit, String(range), currentKey],
+      { revalidate: getCachePolicy("latest").maxAgeSeconds },
+    )();
+  } catch (error) {
+    if (error instanceof DegradedTrendsError) return error.trends;
+    throw error;
+  }
 };

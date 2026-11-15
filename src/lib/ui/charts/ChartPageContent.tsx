@@ -2,12 +2,12 @@ import Link from "next/link";
 import type { MonthPeriod, WeekPeriod, YearPeriod } from "@/lib/charts/period";
 import { moveMonthPeriod, moveYearPeriod } from "@/lib/charts/period";
 import type { ChartQueryResult } from "@/lib/charts/types";
-import { ChartList, DetailActionButton } from "@/lib/ui/charts/ChartList";
+import { DetailActionButton } from "@/lib/ui/charts/ChartList";
+import { ChartSection } from "@/lib/ui/charts/ChartSection";
 import { SiteHeader } from "@/lib/ui/charts/SiteHeader";
-import { WeeklyChartSection } from "@/lib/ui/charts/WeeklyChartSection";
 
 type ChartScope = "weekly" | "monthly" | "yearly";
-type WeeklyViewMode = "track" | "artist";
+type ChartViewMode = "track" | "artist";
 
 type CurrentPeriods = {
   weekly: WeekPeriod;
@@ -24,7 +24,7 @@ type ChartPageContentProps = {
   periods: CurrentPeriods;
   activeScope: ChartScope;
   serverRenderedAt?: string;
-  weeklyViewMode?: WeeklyViewMode;
+  viewMode?: ChartViewMode;
 };
 
 export const ChartPageContent = ({
@@ -36,7 +36,7 @@ export const ChartPageContent = ({
   periods,
   activeScope,
   serverRenderedAt,
-  weeklyViewMode = "track",
+  viewMode = "track",
 }: ChartPageContentProps) => {
   const formatDuration = (milliseconds: number) => {
     const totalMinutes = Math.max(0, Math.floor(milliseconds / 60000));
@@ -65,8 +65,9 @@ export const ChartPageContent = ({
         ? `/monthly/${lastMonth.year}/${String(lastMonth.month).padStart(2, "0")}`
         : `/yearly/${lastYear.year}`;
 
-  const withWeeklyView = (href: string) =>
-    activeScope === "weekly" && weeklyViewMode === "artist"
+  // 구간을 옮겨도 보고 있던 트랙별/아티스트별 보기를 유지한다.
+  const withView = (href: string) =>
+    viewMode === "artist"
       ? href.includes("?")
         ? `${href}&view=artist`
         : `${href}?view=artist`
@@ -106,18 +107,15 @@ export const ChartPageContent = ({
         <div className="flex flex-wrap gap-2">
           {previousHref ? (
             <DetailActionButton
-              href={withWeeklyView(previousHref)}
+              href={withView(previousHref)}
               label="이전 구간"
             />
           ) : null}
           {nextHref ? (
-            <DetailActionButton
-              href={withWeeklyView(nextHref)}
-              label="다음 구간"
-            />
+            <DetailActionButton href={withView(nextHref)} label="다음 구간" />
           ) : null}
           <Link
-            href={withWeeklyView(latestHref)}
+            href={withView(latestHref)}
             className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-[#121212] hover:bg-white"
           >
             {quickLabel}
@@ -125,15 +123,12 @@ export const ChartPageContent = ({
         </div>
 
         {result.kind === "found" ? (
-          activeScope === "weekly" ? (
-            <WeeklyChartSection
-              items={result.chart.items}
-              artistItems={result.artistItems}
-              initialViewMode={weeklyViewMode}
-            />
-          ) : (
-            <ChartList items={result.chart.items} chartType={activeScope} />
-          )
+          <ChartSection
+            items={result.chart.items}
+            artistItems={result.artistItems}
+            chartType={activeScope}
+            initialViewMode={viewMode}
+          />
         ) : result.kind === "not_found" ? (
           <section className="rounded-2xl border border-[#ffdb99]/60 bg-[#1f1f1f] p-6 text-[#ffd59a]">
             <p className="text-lg font-semibold">
