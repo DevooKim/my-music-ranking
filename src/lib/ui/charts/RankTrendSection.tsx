@@ -571,7 +571,7 @@ export const RankTrendSection = ({
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-[#111827]/70 p-2 sm:p-3">
-        <div className="flex items-center gap-3 px-3 pb-2 pt-1 text-[11px] text-[#7c8694] sm:px-4">
+        <div className="hidden items-center gap-3 px-3 pb-2 pt-1 text-[11px] text-[#7c8694] sm:flex sm:px-4">
           <span className="w-9 text-center">현재</span>
           <span className="flex-1">{unitLabel}</span>
           <span className="w-14 text-right">{unitText.previous}</span>
@@ -588,31 +588,40 @@ export const RankTrendSection = ({
                   type="button"
                   onClick={() => setPinnedId(series.id)}
                   aria-pressed={series.id === pinned}
-                  className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors sm:px-4 ${isActive ? "border-[#1ed760]/70 bg-[#141c2a]" : "border-white/10 bg-[#0e121b] hover:bg-[#141c2a]"}`}
+                  className={`flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2.5 text-left sm:gap-3 transition-colors sm:px-4 sm:py-2 ${isActive ? "border-[#1ed760]/70 bg-[#141c2a]" : "border-white/10 bg-[#0e121b] hover:bg-[#141c2a]"}`}
                 >
                   <span
-                    className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${summary.currentRank !== null ? "bg-[#1ed760] text-[#04100a]" : "bg-white/10 text-[#9ca3af]"}`}
+                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold sm:h-9 sm:w-9 ${summary.currentRank !== null ? "bg-[#1ed760] text-[#04100a]" : "bg-white/10 text-[#9ca3af]"}`}
                   >
                     {summary.currentRank ?? "–"}
                   </span>
                   <Thumbnail series={series} rounded={viewMode === "artist"} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold text-[#eef2fb]">
+                    <span className="line-clamp-2 break-words text-sm font-bold leading-snug text-[#eef2fb] sm:line-clamp-1">
                       {series.name}
                     </span>
                     {series.subtitle ? (
-                      <span className="block truncate text-xs text-[#9ca3af]">
+                      <span className="line-clamp-1 text-xs text-[#9ca3af]">
                         {series.subtitle}
                       </span>
                     ) : null}
+                    {/* 모바일: 열을 줄이고 수치는 이름 아래 한 줄로 보여 준다 */}
+                    <span className="mt-1 flex flex-wrap gap-x-2 text-[11px] text-[#9ca3af] sm:hidden">
+                      <span>{describeChange(summary)}</span>
+                      <span>최고 {summary.peakRank}위</span>
+                      <span>
+                        탑 {TREND_TOP_N} {summary.weeksInTop}
+                        {unitText.span}
+                      </span>
+                    </span>
                   </span>
-                  <span className="w-14 shrink-0 text-right text-xs text-[#b6c2d1]">
+                  <span className="hidden w-14 shrink-0 text-right text-xs text-[#b6c2d1] sm:block">
                     {describeChange(summary)}
                   </span>
-                  <span className="w-10 shrink-0 text-right text-xs text-white">
+                  <span className="hidden w-10 shrink-0 text-right text-xs text-white sm:block">
                     {summary.peakRank}위
                   </span>
-                  <span className="w-14 shrink-0 text-right text-xs text-white">
+                  <span className="hidden w-14 shrink-0 text-right text-xs text-white sm:block">
                     {summary.weeksInTop}
                     {unitText.span}
                   </span>
