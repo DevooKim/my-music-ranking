@@ -6,8 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { fetchArtistThumbnails } from "@/lib/charts/artist-thumbnail-query";
 import {
   buildTrendHref,
-  DEFAULT_TREND_RANGE,
-  TREND_RANGE_OPTIONS,
+  formatTrendRange,
   TREND_TOP_N,
   TREND_UNIT_TEXT,
   type TrendPeriod,
@@ -21,6 +20,10 @@ export type TrendViewMode = "track" | "artist";
 
 type RankTrendSectionProps = {
   unit: TrendUnit;
+  /** 구간 시작부터 쌓은 누적 순위인지 여부 */
+  cumulative: boolean;
+  rangeOptions: number[];
+  defaultRange: Record<TrendUnit, number>;
   periods: TrendPeriod[];
   tracks: TrendSeries[];
   artists: TrendSeries[];
@@ -29,21 +32,22 @@ type RankTrendSectionProps = {
 };
 
 const ROW_HEIGHT = 36;
-const PLOT_TOP = 20;
-const PLOT_BOTTOM = 62;
-/** 탑 N 밖으로 나간 흐름을 받아 주는 레인 (활성 시리즈만 표시) */
-const OUT_LANE_OFFSET = 28;
+/** 맨 위 순위 점 위에 값 말풍선이 들어갈 여백을 포함한다. */
+const PLOT_TOP = 38;
+const PLOT_BOTTOM = 34;
 
 const PLOT_LEFT = 30;
-const MIN_STEP = 26;
-const TOOLTIP_WIDTH = 208;
+/** 구간 사이 최소 간격. 이보다 좁아지면 줄이지 않고 가로 스크롤로 넘긴다. */
+const MIN_STEP = 48;
+const AXIS_WIDTH = 24;
 const PLOT_HEIGHT = (TREND_TOP_N - 1) * ROW_HEIGHT;
 const SVG_HEIGHT = PLOT_TOP + PLOT_HEIGHT + PLOT_BOTTOM;
-const OUT_LANE_Y = PLOT_TOP + PLOT_HEIGHT + OUT_LANE_OFFSET;
 
 const SURFACE = "#0e121b";
 const ACCENT = "#1ed760";
 const MUTED_LINE = "#465064";
+/** 선택된 항목이 없을 때 모든 선에 쓰는 중립 색 */
+const NEUTRAL_LINE = "#69758c";
 
 const topRank = (series: TrendSeries, index: number): number | null => {
   const rank = series.points[index]?.rank;
@@ -79,26 +83,28 @@ const buildPath = (
   return path.trim();
 };
 
-/** 탑 N 진입·이탈 구간을 차트 아래 '밖' 레인과 잇는 점선 경로. */
-const buildOutLanePath = (
+/**
+ * 항목이 탑 N에서 마지막으로 보인 지점. 그 뒤로는 그래프에서 완전히 빠져
+ * 오른쪽 끝 라벨 열에도 나오지 않으므로, 선이 끊긴 자리에 이름을 적어 준다.
+ * 마지막 구간까지 남아 있으면 오른쪽 열에 이미 이름이 있어 null이다.
+ */
+const findLastExit = (
   series: TrendSeries,
   weeks: TrendPeriod[],
-  xOf: (index: number) => number,
-): string => {
-  let path = "";
-  for (let index = 0; index < weeks.length - 1; index += 1) {
-    if (!weeks[index].available || !weeks[index + 1].available) continue;
-    const from = topRank(series, index);
-    const to = topRank(series, index + 1);
-    if ((from === null) === (to === null)) continue;
-    const x0 = xOf(index);
-    const x1 = xOf(index + 1);
-    const y0 = from === null ? OUT_LANE_Y : yOf(from);
-    const y1 = to === null ? OUT_LANE_Y : yOf(to);
-    const midX = (x0 + x1) / 2;
-    path += ` M${x0},${y0} C${midX},${y0} ${midX},${y1} ${x1},${y1}`;
+): { index: number; rank: number } | null => {
+  for (let index = weeks.length - 1; index >= 0; index -= 1) {
+    const rank = topRank(series, index);
+    if (rank === null) continue;
+    if (index === weeks.length - 1) return null;
+    // 다음 구간에 차트 자체가 없으면 이탈이 아니라 데이터 공백이다.
+    return weeks[index + 1].available ? { index, rank } : null;
   }
-  return path.trim();
+  return null;
+};
+
+const shortName = (name: string, max = 7): string => {
+  const chars = [...name];
+  return chars.length > max ? `${chars.slice(0, max).join("")}…` : name;
 };
 
 type SeriesSummary = {
@@ -191,6 +197,9 @@ const Thumbnail = ({
 
 export const RankTrendSection = ({
   unit,
+  cumulative,
+  rangeOptions,
+  defaultRange,
   periods: weeks,
   tracks,
   artists,
@@ -244,6 +253,12 @@ export const RankTrendSection = ({
         )
       : 0;
   const svgWidth = PLOT_LEFT + step * lastIndex + labelWidth;
+  const canScroll = containerWidth > 0 && svgWidth > containerWidth + 1;
+  const scrollByPage = (direction: -1 | 1) =>
+    scrollRef.current?.scrollBy({
+      left: direction * containerWidth * 0.7,
+      behavior: "smooth",
+    });
   const xOf = (index: number): number => PLOT_LEFT + index * step;
   const labelEvery = Math.max(1, Math.ceil(44 / Math.max(step, 1)));
 
@@ -253,12 +268,14 @@ export const RankTrendSection = ({
     if (element && svgWidth > 0) element.scrollLeft = element.scrollWidth;
   }, [scrollRef, svgWidth]);
 
-  const defaultId = summaries[0]?.series.id ?? null;
+  // 선택은 기본적으로 없다. 같은 항목을 다시 누르면 선택이 풀린다.
   const pinned =
     pinnedId && summaries.some((item) => item.series.id === pinnedId)
       ? pinnedId
-      : defaultId;
+      : null;
   const activeId = hover?.id ?? pinned;
+  const togglePinned = (id: string) =>
+    setPinnedId((current) => (current === id ? null : id));
 
   const changeView = (next: TrendViewMode) => {
     setViewMode(next);
@@ -318,11 +335,7 @@ export const RankTrendSection = ({
             {(["weekly", "monthly"] as const).map((option) => (
               <Link
                 key={option}
-                href={buildTrendHref(
-                  option,
-                  DEFAULT_TREND_RANGE[option],
-                  viewMode,
-                )}
+                href={buildTrendHref(option, defaultRange[option], viewMode)}
                 scroll={false}
                 aria-current={option === unit ? "true" : undefined}
                 className={`rounded-full px-3 py-1 font-medium ${option === unit ? "bg-white/90 text-[#121212]" : "text-[#b6c2d1] hover:bg-white/10"}`}
@@ -332,7 +345,7 @@ export const RankTrendSection = ({
             ))}
           </div>
           <div className="flex gap-1 rounded-full border border-white/15 bg-black/20 p-1 text-sm">
-            {TREND_RANGE_OPTIONS[unit].map((option) => (
+            {rangeOptions.map((option) => (
               <Link
                 key={option}
                 href={buildTrendHref(unit, option, viewMode)}
@@ -340,8 +353,7 @@ export const RankTrendSection = ({
                 aria-current={option === range ? "true" : undefined}
                 className={`rounded-full px-3 py-1 font-medium ${option === range ? "bg-white/90 text-[#121212]" : "text-[#b6c2d1] hover:bg-white/10"}`}
               >
-                {option}
-                {unitText.span}
+                {formatTrendRange(unit, option)}
               </Link>
             ))}
           </div>
@@ -349,25 +361,69 @@ export const RankTrendSection = ({
       </div>
 
       <section className="rounded-2xl border border-white/10 bg-[#0e121b] p-3 sm:p-5">
-        <h2 className="text-base font-bold text-[#eef2fb]">
-          {unitLabel} 탑 {TREND_TOP_N} 순위 변화
-        </h2>
-        <p className="mt-1 text-xs text-[#9ca3af]">
-          선이나 아래 목록을 선택하면 해당 {unitLabel}의 흐름이 강조됩니다.
-          점선은 탑 {TREND_TOP_N} 밖으로 나가거나 들어온 구간입니다.
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-[#eef2fb]">
+              {unitLabel} 탑 {TREND_TOP_N} {cumulative ? "누적 " : ""}순위 변화
+            </h2>
+          </div>
+          {canScroll ? (
+            <div className="flex shrink-0 gap-1">
+              {([-1, 1] as const).map((direction) => (
+                <button
+                  key={direction}
+                  type="button"
+                  onClick={() => scrollByPage(direction)}
+                  aria-label={
+                    direction === -1
+                      ? "이전 기간으로 스크롤"
+                      : "다음 기간으로 스크롤"
+                  }
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-sm text-[#b6c2d1] hover:bg-white/10"
+                >
+                  {direction === -1 ? "←" : "→"}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
-        <div ref={scrollRef} className="mt-3 overflow-x-auto">
+        <div
+          ref={scrollRef}
+          className="mt-3 overflow-x-auto overscroll-x-contain pb-1"
+        >
           {containerWidth > 0 ? (
             <div
               className="relative"
               style={{ width: svgWidth, height: SVG_HEIGHT }}
             >
+              {/* 가로로 스크롤해도 순위 눈금이 남도록 왼쪽에 고정한다. */}
+              <div
+                aria-hidden="true"
+                className="sticky left-0 z-[2] h-0"
+                style={{ width: AXIS_WIDTH }}
+              >
+                <div
+                  className="absolute left-0 top-0 w-full bg-[#0e121b]"
+                  style={{ height: SVG_HEIGHT }}
+                >
+                  {Array.from({ length: TREND_TOP_N }, (_, index) => (
+                    <span
+                      // biome-ignore lint/suspicious/noArrayIndexKey: 고정 길이 눈금
+                      key={index}
+                      className="absolute right-1.5 -translate-y-1/2 text-[11px] leading-none text-[#7c8694]"
+                      style={{ top: yOf(index + 1) }}
+                    >
+                      {index + 1}
+                    </span>
+                  ))}
+                </div>
+              </div>
               <svg
                 width={svgWidth}
                 height={SVG_HEIGHT}
                 role="img"
-                aria-label={`최근 ${weeks.length}${unitText.span} ${unitText.name} ${unitLabel} 탑 ${TREND_TOP_N} 순위 변화 그래프`}
+                aria-label={`${cumulative ? `${range}년 월별 누적` : `최근 ${weeks.length}${unitText.span} ${unitText.name}`} ${unitLabel} 탑 ${TREND_TOP_N} 순위 변화 그래프`}
                 onMouseLeave={() => setHover(null)}
               >
                 {Array.from({ length: TREND_TOP_N }, (_, index) => {
@@ -382,39 +438,9 @@ export const RankTrendSection = ({
                         stroke="#ffffff"
                         strokeOpacity={0.06}
                       />
-                      <text
-                        x={PLOT_LEFT - 14}
-                        y={yOf(rank)}
-                        textAnchor="end"
-                        dominantBaseline="central"
-                        fontSize={11}
-                        fill="#7c8694"
-                      >
-                        {rank}
-                      </text>
                     </g>
                   );
                 })}
-
-                <text
-                  x={PLOT_LEFT - 14}
-                  y={OUT_LANE_Y}
-                  textAnchor="end"
-                  dominantBaseline="central"
-                  fontSize={11}
-                  fill="#7c8694"
-                >
-                  밖
-                </text>
-                <line
-                  x1={PLOT_LEFT}
-                  x2={xOf(lastIndex)}
-                  y1={OUT_LANE_Y}
-                  y2={OUT_LANE_Y}
-                  stroke="#ffffff"
-                  strokeOpacity={0.12}
-                  strokeDasharray="2 4"
-                />
 
                 {weeks.map((week, index) => {
                   const showLabel = (lastIndex - index) % labelEvery === 0;
@@ -437,20 +463,13 @@ export const RankTrendSection = ({
 
                 {drawOrder.map((series) => {
                   const isActive = series.id === activeId;
-                  const color = isActive ? ACCENT : MUTED_LINE;
+                  const color = isActive
+                    ? ACCENT
+                    : activeId === null
+                      ? NEUTRAL_LINE
+                      : MUTED_LINE;
                   return (
                     <g key={series.id}>
-                      {isActive ? (
-                        <path
-                          d={buildOutLanePath(series, weeks, xOf)}
-                          fill="none"
-                          stroke={ACCENT}
-                          strokeOpacity={0.55}
-                          strokeWidth={2}
-                          strokeDasharray="2 5"
-                          strokeLinecap="round"
-                        />
-                      ) : null}
                       <path
                         d={buildPath(series, xOf)}
                         fill="none"
@@ -473,6 +492,30 @@ export const RankTrendSection = ({
                           />
                         );
                       })}
+                      {/* 선택·호버한 항목이 끝까지 남지 못했다면, 마지막으로 보인 지점 오른쪽에 이름을 한 번만 적는다. */}
+                      {(() => {
+                        const exit = isActive
+                          ? findLastExit(series, weeks)
+                          : null;
+                        if (!exit) return null;
+                        return (
+                          <text
+                            x={xOf(exit.index) + 9}
+                            y={yOf(exit.rank)}
+                            textAnchor="start"
+                            dominantBaseline="central"
+                            fontSize={10}
+                            fill={ACCENT}
+                            fontWeight={700}
+                            stroke={SURFACE}
+                            strokeWidth={3}
+                            paintOrder="stroke"
+                            pointerEvents="none"
+                          >
+                            {shortName(series.name)}
+                          </text>
+                        );
+                      })()}
                     </g>
                   );
                 })}
@@ -511,7 +554,7 @@ export const RankTrendSection = ({
                     <button
                       key={summary.series.id}
                       type="button"
-                      onClick={() => setPinnedId(summary.series.id)}
+                      onClick={() => togglePinned(summary.series.id)}
                       onMouseEnter={() =>
                         setHover({ id: summary.series.id, index: lastIndex })
                       }
@@ -528,39 +571,33 @@ export const RankTrendSection = ({
                   );
                 })}
 
+              {/* 값 말풍선: 위 행과의 빈 줄에 들어가는 작은 크기로 선을 거의 가리지 않는다. */}
               {hover && hoveredSeries && hoveredPoint ? (
                 <div
-                  className="pointer-events-none absolute z-[1] rounded-lg border border-white/15 bg-[#1b2333] px-3 py-2 shadow-lg"
+                  className="pointer-events-none absolute z-[3] -translate-x-1/2 whitespace-nowrap rounded-md border border-white/15 bg-[#1b2333] px-2 py-1 text-xs leading-none text-white shadow-md"
                   style={{
-                    width: TOOLTIP_WIDTH,
                     left: Math.min(
-                      Math.max(xOf(hover.index) - TOOLTIP_WIDTH / 2, 0),
-                      svgWidth - TOOLTIP_WIDTH,
+                      Math.max(xOf(hover.index), AXIS_WIDTH + 100),
+                      svgWidth - 100,
                     ),
-                    ...(hoveredPoint.rank <= 4
-                      ? { top: yOf(hoveredPoint.rank) + 14 }
-                      : { bottom: SVG_HEIGHT - yOf(hoveredPoint.rank) + 14 }),
+                    top: yOf(hoveredPoint.rank) - 36,
                   }}
                 >
-                  <p className="truncate text-sm font-bold text-white">
-                    {hoveredSeries.name}
-                  </p>
-                  {hoveredSeries.subtitle ? (
-                    <p className="truncate text-xs text-[#9ca3af]">
-                      {hoveredSeries.subtitle}
-                    </p>
-                  ) : null}
-                  <p className="mt-1 text-xs text-[#b6c2d1]">
-                    {weeks[hover.index].detailLabel}
-                    {weeks[hover.index].inProgress ? " · 진행 중" : ""}
-                  </p>
-                  <p className="mt-0.5 text-sm text-white">
-                    <span className="font-bold">{hoveredPoint.rank}위</span>
-                    <span className="text-[#b6c2d1]">
-                      {" "}
-                      · 재생 {hoveredPoint.playCount.toLocaleString("ko-KR")}회
-                    </span>
-                  </p>
+                  <span className="font-bold">
+                    {shortName(hoveredSeries.name, 14)}
+                  </span>
+                  <span className="text-[#b6c2d1]">
+                    {" · "}
+                    {hoveredPoint.rank}위
+                  </span>
+                  <span className="text-[#b6c2d1]">
+                    {" · "}
+                    {cumulative ? "누적" : "재생"}{" "}
+                    {hoveredPoint.playCount.toLocaleString("ko-KR")}회
+                    {cumulative
+                      ? ` (+${hoveredPoint.periodPlayCount.toLocaleString("ko-KR")})`
+                      : ""}
+                  </span>
                 </div>
               ) : null}
             </div>
@@ -568,6 +605,11 @@ export const RankTrendSection = ({
             <div style={{ height: SVG_HEIGHT }} />
           )}
         </div>
+        {canScroll ? (
+          <p className="mt-1 text-center text-[11px] text-[#7c8694]">
+            ← 좌우로 밀어서 다른 기간을 볼 수 있어요 →
+          </p>
+        ) : null}
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-[#111827]/70 p-2 sm:p-3">
@@ -586,9 +628,9 @@ export const RankTrendSection = ({
               <li key={series.id}>
                 <button
                   type="button"
-                  onClick={() => setPinnedId(series.id)}
+                  onClick={() => togglePinned(series.id)}
                   aria-pressed={series.id === pinned}
-                  className={`flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2.5 text-left sm:gap-3 transition-colors sm:px-4 sm:py-2 ${isActive ? "border-[#1ed760]/70 bg-[#141c2a]" : "border-white/10 bg-[#0e121b] hover:bg-[#141c2a]"}`}
+                  className={`flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2.5 text-left transition-colors sm:gap-3 sm:px-4 sm:py-2 ${isActive ? "border-[#1ed760]/70 bg-[#141c2a]" : "border-white/10 bg-[#0e121b] hover:bg-[#141c2a]"}`}
                 >
                   <span
                     className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold sm:h-9 sm:w-9 ${summary.currentRank !== null ? "bg-[#1ed760] text-[#04100a]" : "bg-white/10 text-[#9ca3af]"}`}

@@ -3,18 +3,47 @@ export const TREND_TOP_N = 10;
 
 export type TrendUnit = "weekly" | "monthly";
 
-/** 단위별로 고를 수 있는 기간 범위 (주 / 개월 수) */
-export const TREND_RANGE_OPTIONS: Record<TrendUnit, readonly number[]> = {
-  weekly: [8, 12, 26],
-  monthly: [6, 12],
+/** 월간 처리본이 존재하는 가장 이른 연도 */
+export const TREND_FIRST_YEAR = 2025;
+
+/** 주간 그래프에서 고를 수 있는 기간(주) */
+export const WEEKLY_RANGE_OPTIONS: readonly number[] = [8, 12, 26];
+export const DEFAULT_WEEKLY_RANGE = 12;
+
+export interface TrendNow {
+  year: number;
+  month: number;
+}
+
+/**
+ * 단위별 기간 선택지. 주간은 최근 N주, 월간은 연도(그 해 1월부터 쌓은 월별 누적)다.
+ */
+export const getTrendRangeOptions = (
+  unit: TrendUnit,
+  now: TrendNow,
+): number[] => {
+  if (unit === "weekly") return [...WEEKLY_RANGE_OPTIONS];
+  return Array.from(
+    { length: Math.max(1, now.year - TREND_FIRST_YEAR + 1) },
+    (_, index) => now.year - index,
+  );
 };
 
-export const DEFAULT_TREND_RANGE: Record<TrendUnit, number> = {
-  weekly: 12,
-  monthly: 6,
+export const getDefaultTrendRange = (
+  unit: TrendUnit,
+  now: TrendNow,
+): number => {
+  if (unit === "weekly") return DEFAULT_WEEKLY_RANGE;
+  // 1월에는 아직 끝난 달이 없어 올해 그래프가 비므로 작년을 기본으로 한다.
+  return now.month === 1 && now.year > TREND_FIRST_YEAR
+    ? now.year - 1
+    : now.year;
 };
 
-/** 단위별 표기: 범위 접미사, 직전 구간 대비 라벨 */
+export const formatTrendRange = (unit: TrendUnit, option: number): string =>
+  unit === "weekly" ? `${option}주` : `${option}년`;
+
+/** 단위별 표기: 구간 단위 접미사, 직전 구간 대비 라벨 */
 export const TREND_UNIT_TEXT: Record<
   TrendUnit,
   { name: string; span: string; previous: string }
@@ -40,7 +69,10 @@ export interface TrendPeriod {
 
 export interface TrendPoint {
   rank: number;
+  /** 순위를 매긴 기준 재생 수. 누적 그래프에서는 누적 값이다. */
   playCount: number;
+  /** 해당 구간 하나에서만 재생한 횟수 */
+  periodPlayCount: number;
 }
 
 export interface TrendSeries {
@@ -56,6 +88,8 @@ export interface TrendSeries {
 
 export interface RankTrends {
   unit: TrendUnit;
+  /** 구간별 순위가 아니라 구간 시작부터 쌓은 누적 순위인지 여부 */
+  cumulative: boolean;
   periods: TrendPeriod[];
   tracks: TrendSeries[];
   artists: TrendSeries[];
@@ -64,11 +98,15 @@ export interface RankTrends {
 export const toTrendUnit = (value?: string): TrendUnit =>
   value === "monthly" ? "monthly" : "weekly";
 
-export const toTrendRange = (unit: TrendUnit, value?: string): number => {
+export const toTrendRange = (
+  unit: TrendUnit,
+  value: string | undefined,
+  now: TrendNow,
+): number => {
   const parsed = Number.parseInt(value ?? "", 10);
-  return TREND_RANGE_OPTIONS[unit].includes(parsed)
+  return getTrendRangeOptions(unit, now).includes(parsed)
     ? parsed
-    : DEFAULT_TREND_RANGE[unit];
+    : getDefaultTrendRange(unit, now);
 };
 
 export const buildTrendHref = (
@@ -78,8 +116,7 @@ export const buildTrendHref = (
 ): string => {
   const params = new URLSearchParams();
   if (unit !== "weekly") params.set("unit", unit);
-  if (range !== DEFAULT_TREND_RANGE[unit]) params.set("range", String(range));
+  params.set("range", String(range));
   if (view === "artist") params.set("view", "artist");
-  const query = params.toString();
-  return query ? `/trends?${query}` : "/trends";
+  return `/trends?${params.toString()}`;
 };

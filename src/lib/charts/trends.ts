@@ -4,7 +4,7 @@ import { getCachePolicy } from "@/lib/charts/cache-policy";
 import {
   getCurrentMonthPeriod,
   getCurrentWeekPeriod,
-  moveMonthPeriod,
+  getMonthPeriod,
   moveWeekPeriod,
 } from "@/lib/charts/period";
 import { getMonthlyChart, getWeeklyChart } from "@/lib/charts/service";
@@ -12,7 +12,6 @@ import {
   type RankTrends,
   TREND_TOP_N,
   type TrendPeriod,
-  type TrendPoint,
   type TrendSeries,
   type TrendUnit,
 } from "@/lib/charts/trend-types";
@@ -20,7 +19,12 @@ import type { ChartQueryResult } from "@/lib/charts/types";
 
 type SeriesSeed = Omit<TrendSeries, "points">;
 
-type PeriodEntry = SeriesSeed & TrendPoint;
+type PeriodEntry = SeriesSeed & {
+  rank: number;
+  playCount: number;
+  /** 생략하면 playCount와 같다 */
+  periodPlayCount?: number;
+};
 
 const collectSeries = (
   periodEntries: (PeriodEntry[] | null)[],
@@ -50,7 +54,13 @@ const collectSeries = (
     ...seed,
     points: indexed.map((byId) => {
       const entry = byId.get(seed.id);
-      return entry ? { rank: entry.rank, playCount: entry.playCount } : null;
+      return entry
+        ? {
+            rank: entry.rank,
+            playCount: entry.playCount,
+            periodPlayCount: entry.periodPlayCount ?? entry.playCount,
+          }
+        : null;
     }),
   }));
 };
@@ -84,18 +94,63 @@ const buildWeeklySlots = (count: number): PeriodSlot[] => {
   });
 };
 
-const buildMonthlySlots = (count: number): PeriodSlot[] => {
-  const current = getCurrentMonthPeriod();
-  return Array.from({ length: count }, (_, index) => {
-    const period = moveMonthPeriod(current, index - (count - 1));
+/** 해당 연도의 1~12월. 아직 오지 않은 달은 조회 없이 비어 있는 구간이 된다. */
+const buildMonthlySlots = (year: number): PeriodSlot[] =>
+  Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
+    const period = getMonthPeriod(year, month);
     return {
-      key: `${period.year}-${pad2(period.month)}`,
+      key: `${year}-${pad2(month)}`,
       start: period.start,
       end: period.end,
-      label: `${period.month}월`,
-      detailLabel: `${period.year}년 ${period.month}월`,
-      load: () => getMonthlyChart(period.year, period.month),
+      label: `${month}월`,
+      detailLabel: `${year}년 ${month}월까지 누적`,
+      load: () => getMonthlyChart(year, month),
     };
+  });
+
+/**
+ * 구간별 순위를 구간 시작부터 쌓은 누적 순위로 바꾼다.
+ * 재생 수는 구간마다 더하고, 동률이면 직전 구간의 누적 순위를 이어받는다.
+ * 처리본이 빠진 중간 구간은 재생이 없었던 것으로 보고 직전 순위를 그대로 둔다.
+ */
+const accumulate = (
+  periodEntries: (PeriodEntry[] | null)[],
+): (PeriodEntry[] | null)[] => {
+  const totals = new Map<string, PeriodEntry>();
+  let previousRank = new Map<string, number>();
+  let started = false;
+
+  return periodEntries.map((entries) => {
+    if (entries === null && !started) return null;
+    started = true;
+
+    const thisPeriod = new Map<string, number>();
+    for (const entry of entries ?? []) {
+      thisPeriod.set(entry.id, entry.playCount);
+      const current = totals.get(entry.id);
+      totals.set(entry.id, {
+        ...entry,
+        imageUrl: entry.imageUrl ?? current?.imageUrl ?? null,
+        url: entry.url ?? current?.url ?? null,
+        playCount: (current?.playCount ?? 0) + entry.playCount,
+      });
+    }
+
+    const ranked = Array.from(totals.values()).sort((a, b) => {
+      if (a.playCount !== b.playCount) return b.playCount - a.playCount;
+      const rankA = previousRank.get(a.id) ?? Number.POSITIVE_INFINITY;
+      const rankB = previousRank.get(b.id) ?? Number.POSITIVE_INFINITY;
+      if (rankA !== rankB) return rankA - rankB;
+      return a.name.localeCompare(b.name, "ko");
+    });
+
+    previousRank = new Map(ranked.map((entry, index) => [entry.id, index + 1]));
+    return ranked.map((entry, index) => ({
+      ...entry,
+      rank: index + 1,
+      periodPlayCount: thisPeriod.get(entry.id) ?? 0,
+    }));
   });
 };
 
@@ -103,6 +158,7 @@ const computeRankTrends = async (
   unit: TrendUnit,
   range: number,
 ): Promise<{ trends: RankTrends; degraded: boolean }> => {
+  const cumulative = unit === "monthly";
   const slots =
     unit === "weekly" ? buildWeeklySlots(range) : buildMonthlySlots(range);
   const results = await Promise.all(slots.map((slot) => slot.load()));
@@ -152,8 +208,13 @@ const computeRankTrends = async (
   let offset = 0;
   while (offset < length && trackEntries[offset] === null) offset += 1;
 
+  const shape = (
+    entries: (PeriodEntry[] | null)[],
+  ): (PeriodEntry[] | null)[] => (cumulative ? accumulate(entries) : entries);
+
   const trends: RankTrends = {
     unit,
+    cumulative,
     periods: slots.slice(offset, length).map((slot, index) => ({
       key: slot.key,
       start: slot.start,
@@ -164,8 +225,8 @@ const computeRankTrends = async (
       // 주간은 마지막 칸이 진행 중인 이번 주다. 월간은 완료된 달만 처리본이 있다.
       inProgress: unit === "weekly" && offset + index === slots.length - 1,
     })),
-    tracks: collectSeries(trackEntries.slice(offset, length)),
-    artists: collectSeries(artistEntries.slice(offset, length)),
+    tracks: collectSeries(shape(trackEntries).slice(offset, length)),
+    artists: collectSeries(shape(artistEntries).slice(offset, length)),
   };
 
   return {

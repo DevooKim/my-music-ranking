@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { getCurrentPeriods } from "@/lib/charts/service";
 import {
+  formatTrendRange,
+  getDefaultTrendRange,
+  getTrendRangeOptions,
   TREND_TOP_N,
   TREND_UNIT_TEXT,
   toTrendRange,
@@ -21,19 +24,23 @@ export default async function TrendsPage({
   searchParams?: Promise<{ view?: string; unit?: string; range?: string }>;
 }) {
   const resolvedSearchParams = (await searchParams) ?? {};
+  const periods = getCurrentPeriods();
+  const now = { year: periods.monthly.year, month: periods.monthly.month };
   const unit = toTrendUnit(resolvedSearchParams.unit);
-  const range = toTrendRange(unit, resolvedSearchParams.range);
+  const range = toTrendRange(unit, resolvedSearchParams.range, now);
   const viewMode = resolvedSearchParams.view === "artist" ? "artist" : "track";
   const unitText = TREND_UNIT_TEXT[unit];
 
   const trends = await getRankTrends(unit, range);
   const first = trends.periods[0];
   const last = trends.periods[trends.periods.length - 1];
-  const summary = `${unitText.name} 탑 ${TREND_TOP_N} 순위 변화`;
+  const summary = trends.cumulative
+    ? `${range}년 월별 누적 탑 ${TREND_TOP_N} 순위 변화`
+    : `${unitText.name} 탑 ${TREND_TOP_N} 순위 변화`;
 
   return (
     <>
-      <SiteHeader activeScope="trends" periods={getCurrentPeriods()} />
+      <SiteHeader activeScope="trends" periods={periods} />
 
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:gap-6 sm:py-10">
         <header className="space-y-2">
@@ -51,6 +58,12 @@ export default async function TrendsPage({
           <RankTrendSection
             key={`${unit}-${range}`}
             unit={unit}
+            cumulative={trends.cumulative}
+            rangeOptions={getTrendRangeOptions(unit, now)}
+            defaultRange={{
+              weekly: getDefaultTrendRange("weekly", now),
+              monthly: getDefaultTrendRange("monthly", now),
+            }}
             periods={trends.periods}
             tracks={trends.tracks}
             artists={trends.artists}
@@ -63,9 +76,9 @@ export default async function TrendsPage({
               표시할 {unitText.name} 차트가 아직 없습니다.
             </p>
             <p className="mt-2 text-sm">
-              최근 {range}
-              {unitText.span} 동안 집계된 {unitText.name} 차트를 찾지
-              못했습니다.
+              {unit === "weekly" ? "최근 " : ""}
+              {formatTrendRange(unit, range)} 동안 집계된 {unitText.name} 차트를
+              찾지 못했습니다.
             </p>
           </section>
         )}
