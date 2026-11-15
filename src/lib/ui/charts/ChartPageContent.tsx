@@ -3,6 +3,7 @@ import type { MonthPeriod, WeekPeriod, YearPeriod } from "@/lib/charts/period";
 import { moveMonthPeriod, moveYearPeriod } from "@/lib/charts/period";
 import type { ChartQueryResult } from "@/lib/charts/types";
 import { ChartList, DetailActionButton } from "@/lib/ui/charts/ChartList";
+import { SiteHeader } from "@/lib/ui/charts/SiteHeader";
 import { WeeklyChartSection } from "@/lib/ui/charts/WeeklyChartSection";
 
 type ChartScope = "weekly" | "monthly" | "yearly";
@@ -80,44 +81,7 @@ export const ChartPageContent = ({
 
   return (
     <>
-      <header className="sticky top-0 z-10 border-b border-white/10 bg-[#0b1020]/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
-          <Link href="/" className="flex items-center gap-3">
-            <img
-              src="/logo.svg"
-              alt="My Music Ranking logo"
-              className="h-9 w-auto flex-none sm:h-10"
-            />
-            <span className="text-sm font-semibold tracking-[0.12em] text-[#b7ffe0] sm:text-base">
-              My Music Ranking
-            </span>
-          </Link>
-          <nav className="grid w-full grid-cols-3 gap-2 text-xs sm:flex sm:w-auto sm:gap-2 sm:text-sm">
-            <Link
-              href="/"
-              className={`rounded-full px-2.5 py-1.5 text-center ${activeScope === "weekly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"} sm:px-4`}
-            >
-              주간
-            </Link>
-            <Link
-              href={`/monthly/${activeScope === "monthly" ? String(periods.monthly.year) : String(lastMonth.year)}/${activeScope === "monthly" ? String(periods.monthly.month).padStart(2, "0") : String(lastMonth.month).padStart(2, "0")}`}
-              className={`rounded-full px-2.5 py-1.5 text-center ${activeScope === "monthly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"} sm:px-4`}
-            >
-              월간
-            </Link>
-            <Link
-              href={
-                activeScope === "yearly"
-                  ? `/yearly/${periods.yearly.year}`
-                  : `/yearly/${lastYear.year}`
-              }
-              className={`rounded-full px-2.5 py-1.5 text-center ${activeScope === "yearly" ? "bg-[#1ed760] text-[#04100a]" : "border border-white/20 text-white hover:bg-white/10"} sm:px-4`}
-            >
-              연간
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <SiteHeader activeScope={activeScope} periods={periods} />
 
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:gap-6 sm:py-10">
         <header className="space-y-2">
