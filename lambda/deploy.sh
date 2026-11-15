@@ -48,14 +48,23 @@ if [ "$1" == "--guided" ]; then
         --parameter-overrides \
         "SpotifyClientId=$SPOTIFY_CLIENT_ID" \
         "SpotifyClientSecret=$SPOTIFY_CLIENT_SECRET" \
-        "SpotifyRefreshToken=$SPOTIFY_REFRESH_TOKEN"
+        "SpotifyRefreshToken=$SPOTIFY_REFRESH_TOKEN" \
+        "DiscordWebhookUrl=${DISCORD_WEBHOOK_URL:-}" \
+        "SpotifyAuthorizedAt=${SPOTIFY_AUTHORIZED_AT:-}"
 else
     sam deploy --template-file .aws-sam/build/template.yaml \
+        --config-file "$SCRIPT_DIR/samconfig.toml" \
+        --stack-name my-music-ranking \
+        --region "${AWS_REGION:-ap-northeast-2}" \
+        --capabilities CAPABILITY_IAM \
+        --no-confirm-changeset \
         --s3-bucket "$S3_ARTIFACTS_BUCKET" \
         --parameter-overrides \
         "SpotifyClientId=$SPOTIFY_CLIENT_ID" \
         "SpotifyClientSecret=$SPOTIFY_CLIENT_SECRET" \
-        "SpotifyRefreshToken=$SPOTIFY_REFRESH_TOKEN"
+        "SpotifyRefreshToken=$SPOTIFY_REFRESH_TOKEN" \
+        "DiscordWebhookUrl=${DISCORD_WEBHOOK_URL:-}" \
+        "SpotifyAuthorizedAt=${SPOTIFY_AUTHORIZED_AT:-}"
 fi
 
 echo "✅ Deployment completed!"

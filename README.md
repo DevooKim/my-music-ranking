@@ -35,9 +35,20 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
+## Collector Discord alerts
+
+When the Spotify collector Lambda fails (token expiry, API/S3 errors), it posts
+to Discord if `DISCORD_WEBHOOK_URL` is set in `lambda/.env.lambda`. Processor
+success notifications stay off unless `DISCORD_NOTIFICATION_ENABLED=true`.
+After changing the webhook, redeploy with `cd lambda && ./deploy.sh`.
+
+The collector also reminds at 14, 7, 3, 2, and 1 days before the refresh token's
+6-month expiry, using `SPOTIFY_AUTHORIZED_AT` written by the reauthorization tool.
+
 ## Spotify collector reauthorization
 
-Spotify refresh tokens expire six months after authorization. When the collector
+Spotify refresh tokens expire six months after authorization. Access-token
+refresh does not extend that lifetime. When the collector
 logs `Spotify reauthorization required (invalid_grant; HTTP 400)`, add
 `http://127.0.0.1:8888/callback` to the app's redirect URIs in the Spotify
 Developer Dashboard, then run:

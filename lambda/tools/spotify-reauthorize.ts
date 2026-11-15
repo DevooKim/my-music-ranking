@@ -141,13 +141,16 @@ const main = async (): Promise<void> => {
     clientSecret,
   );
 
-  await writeFile(
-    ENV_PATH,
+  const authorizedAt = new Date().toISOString();
+  const updated = replaceEnvValue(
     replaceEnvValue(source, "SPOTIFY_REFRESH_TOKEN", refreshToken),
-    { mode: 0o600 },
+    "SPOTIFY_AUTHORIZED_AT",
+    authorizedAt,
   );
+  await writeFile(ENV_PATH, updated, { mode: 0o600 });
   await chmod(ENV_PATH, 0o600);
   console.log("Updated SPOTIFY_REFRESH_TOKEN in lambda/.env.lambda.");
+  console.log(`Recorded SPOTIFY_AUTHORIZED_AT=${authorizedAt}`);
   console.log("Run: cd lambda && ./deploy.sh");
 };
 

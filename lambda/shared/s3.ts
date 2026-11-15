@@ -10,6 +10,7 @@ export const s3Paths = {
 
   // 메타데이터
   nextMetadata: () => `metadata/recently-played/next.json`,
+  spotifyReauthReminder: () => `metadata/spotify-reauth-reminder.json`,
 
   trackStats: () => `metadata/track-stats.json`,
   trackStatsParquet: () => `metadata/track-stats.parquet`,

@@ -173,6 +173,96 @@ export function buildTrackStatsNotificationPayload(context: TrackStatsNotificati
   };
 }
 
+export interface CollectorFailureContext {
+  message: string;
+  requiresReauthorization: boolean;
+}
+
+const DISCORD_FIELD_VALUE_LIMIT = 1024;
+
+const clipFieldValue = (value: string): string =>
+  value.length <= DISCORD_FIELD_VALUE_LIMIT
+    ? value
+    : `${value.slice(0, DISCORD_FIELD_VALUE_LIMIT - 1)}…`;
+
+export interface ReauthReminderContext {
+  remainingDays: number;
+  expiry: string;
+}
+
+export function buildReauthReminderPayload(
+  context: ReauthReminderContext,
+): DiscordWebhookPayload {
+  const remainingLabel =
+    context.remainingDays <= 0
+      ? "오늘"
+      : `${context.remainingDays}일 전`;
+
+  return {
+    username: "my-music-ranking",
+    embeds: [
+      {
+        title: `Spotify 재승인 ${remainingLabel}`,
+        color: context.remainingDays <= 3 ? statusColor("error") : statusColor("partial"),
+        fields: [
+          {
+            name: "expires",
+            value: context.expiry,
+            inline: true,
+          },
+          {
+            name: "remainingDays",
+            value: String(context.remainingDays),
+            inline: true,
+          },
+          {
+            name: "action",
+            value: "bun lambda/tools/spotify-reauthorize.ts && cd lambda && ./deploy.sh",
+            inline: false,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+export function buildCollectorFailurePayload(
+  context: CollectorFailureContext,
+): DiscordWebhookPayload {
+  const reason = context.requiresReauthorization
+    ? "reauthorization"
+    : "error";
+
+  return {
+    username: "my-music-ranking",
+    embeds: [
+      {
+        title: context.requiresReauthorization
+          ? "collector: Spotify reauthorization required"
+          : "collector failed",
+        color: statusColor("error"),
+        fields: [
+          {
+            name: "function",
+            value: "collector",
+            inline: true,
+          },
+          {
+            name: "reason",
+            value: reason,
+            inline: true,
+          },
+          {
+            name: "message",
+            value: clipFieldValue(context.message || "unknown error"),
+            inline: false,
+          },
+        ],
+      },
+    ],
+  };
+}
+
 export async function sendDiscordNotification(
   payload: DiscordWebhookPayload,
   webhookUrl?: string | null,

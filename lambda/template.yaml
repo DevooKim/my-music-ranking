@@ -16,7 +16,7 @@ Globals:
         TRACK_STATS_STORAGE_FORMATS: both
         TRACK_STATS_READ_PREFERENCE: parquet
         DISCORD_NOTIFICATION_ENABLED: "false"
-        DISCORD_WEBHOOK_URL: ""
+        DISCORD_WEBHOOK_URL: !Ref DiscordWebhookUrl
 
 Parameters:
   S3BucketName:
@@ -32,6 +32,15 @@ Parameters:
   SpotifyRefreshToken:
     Type: String
     NoEcho: true
+  DiscordWebhookUrl:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Discord webhook URL for collector failure alerts
+  SpotifyAuthorizedAt:
+    Type: String
+    Default: ""
+    Description: ISO timestamp of the last Spotify user authorization
 
 Resources:
 
@@ -55,6 +64,7 @@ Resources:
           SPOTIFY_CLIENT_ID: !Ref SpotifyClientId
           SPOTIFY_CLIENT_SECRET: !Ref SpotifyClientSecret
           SPOTIFY_REFRESH_TOKEN: !Ref SpotifyRefreshToken
+          SPOTIFY_AUTHORIZED_AT: !Ref SpotifyAuthorizedAt
       Policies:
         - S3CrudPolicy:
             BucketName: !Ref S3BucketName

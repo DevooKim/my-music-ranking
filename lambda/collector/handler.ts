@@ -1,4 +1,4 @@
-import { refreshAccessToken, fetchRecentlyPlayedByUrl, buildAfterUrl } from "../shared/spotify";
+import { refreshAccessToken, fetchRecentlyPlayedByUrl, buildAfterUrl, SpotifyTokenRefreshError } from "../shared/spotify";
 import {
   mapSpotifyToPlayedItem,
   deduplicatePlayedItems,
@@ -6,12 +6,23 @@ import {
 } from "../shared/mapper";
 import { s3Paths, getS3Json, putS3Json } from "../shared/s3";
 import type { RawPlayedData, PlayedItem, NextMetadata } from "../shared/types";
+import {
+  buildCollectorFailurePayload,
+  sendDiscordNotification,
+} from "../shared/discord-notify";
+import { maybeSendReauthReminder } from "../shared/spotify-reauth-reminder";
 
 export const handler = async (): Promise<void> => {
   // API 요청 전 현재 시간 기록 (items가 없을 경우 after URL 생성에 사용)
   const requestTimestamp = Date.now();
 
   console.log(`Collector started at ${new Date(requestTimestamp).toISOString()}`);
+
+  try {
+    await maybeSendReauthReminder(new Date(requestTimestamp));
+  } catch (reminderError) {
+    console.warn("Reauth reminder failed (non-blocking):", reminderError);
+  }
 
   try {
     // 1. 메타데이터에서 next URL 읽기
@@ -91,6 +102,19 @@ export const handler = async (): Promise<void> => {
     console.log(`Updated next metadata: ${newNextUrl}`);
   } catch (error) {
     console.error("Collection failed:", error);
+    try {
+      const requiresReauthorization =
+        error instanceof SpotifyTokenRefreshError && error.requiresReauthorization;
+      await sendDiscordNotification(
+        buildCollectorFailurePayload({
+          message: error instanceof Error ? error.message : String(error),
+          requiresReauthorization,
+        }),
+        process.env.DISCORD_WEBHOOK_URL,
+      );
+    } catch (notifyError) {
+      console.warn("Failed to send discord notification:", notifyError);
+    }
     throw error;
   }
 };
