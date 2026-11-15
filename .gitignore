@@ -52,3 +52,7 @@ next-env.d.ts
 
 data/spotify-raw/*
 /.cache/artist-thumbnails
+
+# local agent tooling
+/.agents/
+/.pi/
