@@ -1,4 +1,4 @@
-const SHELL_CACHE = "my-music-ranking-shell-v2";
+const SHELL_CACHE = "my-music-ranking-shell-v3";
 
 const SHELL_ASSETS = [
   "/",
@@ -9,6 +9,17 @@ const SHELL_ASSETS = [
   "/pwa-512.svg",
   "/favicon.ico",
 ];
+
+const isShellAsset = (request) => {
+  try {
+    const url = new URL(request.url);
+    return (
+      url.origin === self.location.origin && SHELL_ASSETS.includes(url.pathname)
+    );
+  } catch {
+    return false;
+  }
+};
 
 const cacheAsset = async (cache, asset) => {
   try {
@@ -21,6 +32,15 @@ const cacheAsset = async (cache, asset) => {
     return;
   }
 };
+
+const offlineResponse = () =>
+  new Response("오프라인 상태입니다. 연결 상태를 확인해 주세요.", {
+    status: 503,
+    statusText: "Service Unavailable",
+    headers: {
+      "Content-Type": "text/plain; charset=UTF-8",
+    },
+  });
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -50,34 +70,26 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  if (request.method !== "GET" || !request.url.startsWith(self.location.origin)) {
+  if (
+    request.method !== "GET" ||
+    !request.url.startsWith(self.location.origin)
+  ) {
     return;
   }
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(async () => {
-          const fallback = await caches.match("/");
-          return (
-            fallback ||
-            new Response("오프라인 상태입니다. 연결 상태를 확인해 주세요.", {
-              status: 503,
-              statusText: "Service Unavailable",
-              headers: {
-                "Content-Type": "text/plain; charset=UTF-8",
-              },
-            })
-          );
-        }),
+      fetch(request).catch(async () => {
+        const cachedRoot = await caches.match(
+          new URL("/", self.location.origin).toString(),
+        );
+        return cachedRoot ?? offlineResponse();
+      }),
     );
+    return;
+  }
+
+  if (!isShellAsset(request)) {
     return;
   }
 
@@ -100,16 +112,7 @@ self.addEventListener("fetch", (event) => {
             .catch(() => undefined);
           return response;
         })
-        .catch(
-          () =>
-            new Response("오프라인 상태입니다. 연결 상태를 확인해 주세요.", {
-              status: 503,
-              statusText: "Service Unavailable",
-              headers: {
-                "Content-Type": "text/plain; charset=UTF-8",
-              },
-            }),
-        );
+        .catch(() => offlineResponse());
     }),
   );
 });
